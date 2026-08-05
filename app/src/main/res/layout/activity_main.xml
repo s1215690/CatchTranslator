@@ -383,6 +383,32 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:text="回應風格"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <CheckBox
+            android:id="@+id/cbNarration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="旁白模式（AI 用「佢」描述你嘅一刻，拉開觀察距離）"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="關閉＝AI 直接同你講嘢；開啟＝AI 好似旁白咁描述你嘅一刻，幫你抽離。"
+            android:textSize="12sp"
+            android:textColor="#7F8C8D" />
+
+        <!-- 統計儀錶盤 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
             android:text="統計"
             android:textSize="16sp"
             android:textStyle="bold"

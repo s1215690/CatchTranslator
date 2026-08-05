@@ -90,7 +90,7 @@ public class AiEngine {
     };
 
     /** 本地 fallback：按關鍵字粗略分類，再隨機揀回應（唔會用「收到／記低」式應答）。 */
-    public static Response fallback(String text) {
+    public static Response fallback(String text, boolean narration) {
         String type = "other";
         String[] pool = FB_OTHER;
         if (text.contains("廢") || text.contains("唔配") || text.contains("失敗")
@@ -124,7 +124,13 @@ public class AiEngine {
             pool = FB_WORTH;
         }
         String reply = pool[Math.abs(new Random().nextInt()) % pool.length];
+        if (narration) reply = toNarration(reply);
         return new Response(type, reply, fallbackButtons());
+    }
+
+    /** 旁白模式：將「你」改做「佢」，拉開觀察距離。 */
+    private static String toNarration(String s) {
+        return s.replace("你哋", "佢哋").replace("你", "佢");
     }
 
     public static List<String> fallbackButtons() {
@@ -140,6 +146,7 @@ public class AiEngine {
     public static Response respond(Context ctx, String text) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String key = p.getString("api_key", "");
+        boolean narration = p.getBoolean("narration_enabled", false);
         if (!key.isEmpty()) {
             try {
                 String sys = "你係「YupiSaver」嘅即時回應引擎。你要服務嘅用戶，長期被內在機制困住，你要按佢嘅情況回應：\n"
@@ -155,6 +162,7 @@ public class AiEngine {
                         + "- 「溫柔看守」出現：指認佢嘅好意但方案唔work：「佢想保護你，但跟住佢做，結果係更難受」——唔好鬧佢。\n"
                         + "- 佢覺得自己唔重要：指認「你嘅翻譯官將所有『被在乎』嘅證據都貪污咗」，唔好反過來猛咁讚佢，唔好同佢爭辯。\n"
                         + "- 廣東話口語、溫暖、30-80字（至多80字，唔好超過）、每次角度同措辭唔同、唔好重複自己、唔好以「收到」「已記低」「OK」開頭、唔好做應答式確認。\n"
+                        + "【旁白模式已開啟】你嘅回應必須用旁白式：用第三人稱「佢」描述用戶嘅一刻，唔好用「你」；例如：「佢啱啱認出翻譯官又喺度講嘢——『你唔配』。佢冇同佢辯，淨係認得佢就夠。」語氣保持溫暖，好似紀錄片旁白。\n"
                         + "而家背景：" + nowTime() + "。佢最近嘅記錄：\n" + recordsContext(ctx, 5)
                         + "\n做三件事：\n"
                         + "1. 判斷類型：critic=翻譯官批判聲（「佢又話我唔配」「我覺得自己好懶」）；guardian=溫柔看守／安全陷阱（「坐喺度就安全」「唔好郁就冇事」）；stuck=冇動力／僵住（「我動唔到」「唔想覆信息」）；feeling=真實感受／身體狀態（「心口好實」）；worth=覺得自己唔重要／值唔值得（「我對佢哋嚟講唔重要」）；other=其他。\n"
@@ -182,7 +190,7 @@ public class AiEngine {
                 }
             } catch (Exception ignored) {}
         }
-        return fallback(text);
+        return fallback(text, narration);
     }
 
     /** 單行回應（反駁／問題等）。冇 key 或者連唔到線就畀一句兜底。 */
