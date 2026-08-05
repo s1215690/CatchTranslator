@@ -147,6 +147,7 @@ public class AiEngine {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String key = p.getString("api_key", "");
         boolean narration = p.getBoolean("narration_enabled", false);
+        DebugLog.add("AI", "輸入: " + truncate(text, 100) + " | narration=" + narration + " | 有key=" + !key.isEmpty());
         if (!key.isEmpty()) {
             try {
                 String sys = "你係「YupiSaver」嘅即時回應引擎。你要服務嘅用戶，長期被內在機制困住，你要按佢嘅情況回應：\n"
@@ -186,9 +187,14 @@ public class AiEngine {
                     if (buttons.size() != 4) buttons = null;
                 }
                 if (!reply.isEmpty() && reply.length() <= 150) {
+                    DebugLog.add("AI", "解析 OK: type=" + type + " | reply=" + truncate(reply, 80)
+                            + " | buttons=" + (buttons == null ? "null(保持原按鈕)" : buttons.size()));
                     return new Response(type, reply, buttons);
                 }
-            } catch (Exception ignored) {}
+                DebugLog.add("AI", "解析失敗: reply=" + truncate(reply, 60) + "（超長或空）→ fallback");
+            } catch (Exception e) {
+                DebugLog.add("AI", "異常: " + e.getClass().getSimpleName() + " " + truncate(e.getMessage(), 100) + " → fallback");
+            }
         }
         return fallback(text, narration);
     }
@@ -202,8 +208,11 @@ public class AiEngine {
             String out = DeepSeekClient.chat(
                     p.getString("base_url", "https://api.deepseek.com"),
                     key, p.getString("model", "deepseek-chat"), sys, userMsg).trim();
+            DebugLog.add("AI", "oneLine 返回: " + truncate(out, 80));
             if (!out.isEmpty() && out.length() <= 60) return out;
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            DebugLog.add("AI", "oneLine 異常: " + e.getClass().getSimpleName());
+        }
         return "好，我哋遲啲再傾。";
     }
 
@@ -237,9 +246,20 @@ public class AiEngine {
                 String s = arr.getString(i).trim();
                 if (!s.isEmpty() && s.length() <= 20) res.add(s);
             }
-            if (res.size() == 4) return res;
-        } catch (Exception ignored) {}
+            if (res.size() == 4) {
+                DebugLog.add("AI", "生成按鈕 OK: " + res);
+                return res;
+            }
+            DebugLog.add("AI", "生成按鈕失敗(唔夠4個): " + res);
+        } catch (Exception e) {
+            DebugLog.add("AI", "生成按鈕異常: " + e.getClass().getSimpleName());
+        }
         return fallbackButtons();
+    }
+
+    private static String truncate(String s, int n) {
+        if (s == null) return "null";
+        return s.length() > n ? s.substring(0, n) + "…" : s;
     }
 
     public static String recordsContext(Context ctx, int n) {

@@ -23,8 +23,10 @@ import android.widget.Toast;
 /** 主頁：設定 API key + 開關懸浮按鈕 + 睇記錄。 */
 public class MainActivity extends Activity {
 
-    private EditText etKey, etModel, etBase;
-    private TextView tvStatus, tvRecords, tvSummary, tvStats;
+    private EditText etKey, etModel, etBase, etDebugToken, etDebugChatId;
+    private TextView tvStatus, tvRecords, tvSummary, tvStats, tvLog;
+    private Button btnLogToggle, btnSendLog;
+    private boolean logVisible = false;
     private Spinner spEdgeVoice, spEdgeStyle;
     private LinearLayout llEdge;
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
@@ -44,6 +46,8 @@ public class MainActivity extends Activity {
         etKey = findViewById(R.id.etApiKey);
         etModel = findViewById(R.id.etModel);
         etBase = findViewById(R.id.etBaseUrl);
+        etDebugToken = findViewById(R.id.etDebugToken);
+        etDebugChatId = findViewById(R.id.etDebugChatId);
         tvStatus = findViewById(R.id.tvOverlayStatus);
         tvRecords = findViewById(R.id.tvRecords);
         tvSummary = findViewById(R.id.tvSummary);
@@ -89,8 +93,30 @@ public class MainActivity extends Activity {
         etKey.setText(p.getString("api_key", ""));
         etModel.setText(p.getString("model", "deepseek-chat"));
         etBase.setText(p.getString("base_url", "https://api.deepseek.com"));
+        etDebugToken.setText(p.getString("debug_token", ""));
+        etDebugChatId.setText(p.getString("debug_chat_id", ""));
 
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
+        btnLogToggle = findViewById(R.id.btnLogToggle);
+        btnSendLog = findViewById(R.id.btnSendLog);
+        tvLog = findViewById(R.id.tvLog);
+        btnLogToggle.setOnClickListener(v -> {
+            logVisible = !logVisible;
+            tvLog.setVisibility(logVisible ? View.VISIBLE : View.GONE);
+            if (logVisible) tvLog.setText(DebugLog.dump());
+            btnLogToggle.setText(logVisible ? "📋 收埋 Log" : "📋 睇 AI Log");
+        });
+        btnSendLog.setOnClickListener(v -> {
+            if (etDebugToken.getText().toString().trim().isEmpty()
+                    || etDebugChatId.getText().toString().trim().isEmpty()) {
+                Toast.makeText(this, "請先喺設定填 TG Bot Token 同 Chat ID", Toast.LENGTH_LONG).show();
+                return;
+            }
+            save();
+            Toast.makeText(this, "發送緊 AI Log 去 Telegram…", Toast.LENGTH_SHORT).show();
+            DebugLog.sendToTelegram(this, () -> runOnUiThread(() ->
+                    Toast.makeText(MainActivity.this, "已發送 ✅", Toast.LENGTH_SHORT).show()));
+        });
         findViewById(R.id.btnTest).setOnClickListener(v -> test());
         findViewById(R.id.btnStop).setOnClickListener(v -> {
             getSharedPreferences("settings", MODE_PRIVATE)
@@ -229,6 +255,8 @@ public class MainActivity extends Activity {
                 .putString("api_key", etKey.getText().toString().trim())
                 .putString("model", etModel.getText().toString().trim())
                 .putString("base_url", etBase.getText().toString().trim())
+                .putString("debug_token", etDebugToken.getText().toString().trim())
+                .putString("debug_chat_id", etDebugChatId.getText().toString().trim())
                 .putString("minimax_key", etMiniMaxKey.getText().toString().trim())
                 .putString("minimax_voice",
                         MiniMaxTts.VOICE_IDS[Math.max(0, spMiniMaxVoice.getSelectedItemPosition())])

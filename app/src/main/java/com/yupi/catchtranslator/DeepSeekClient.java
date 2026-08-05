@@ -23,6 +23,8 @@ public class DeepSeekClient {
         if (!url.endsWith("/")) url += "/";
         url += "chat/completions";
 
+        DebugLog.add("DS", "POST " + model + " | user=" + truncate(user, 120) + " | max_tokens=" + maxTokens);
+
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod("POST");
         c.setRequestProperty("Content-Type", "application/json");
@@ -49,6 +51,7 @@ public class DeepSeekClient {
         int code = c.getResponseCode();
         InputStream is = (code >= 200 && code < 300) ? c.getInputStream() : c.getErrorStream();
         String resp = readAll(is);
+        DebugLog.add("DS", "HTTP " + code + " | resp=" + truncate(resp, 400));
         if (code < 200 || code >= 300) {
             throw new Exception("API 錯誤 " + code + ": " + truncate(resp, 200));
         }

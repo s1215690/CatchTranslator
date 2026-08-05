@@ -85,6 +85,34 @@
                 android:text="測試連線" />
         </LinearLayout>
 
+        <!-- 調試（發 AI Log 去 Telegram） -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="調試（AI Log 發送去 Telegram）"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <EditText
+            android:id="@+id/etDebugToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:hint="TG Bot Token（可選，例如 123456:ABC...）"
+            android:inputType="text"
+            android:maxLines="1" />
+
+        <EditText
+            android:id="@+id/etDebugChatId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:hint="TG Chat ID（可選，例如 5517170901）"
+            android:inputType="number"
+            android:maxLines="1" />
+
         <!-- 懸浮按鈕 -->
         <TextView
             android:layout_width="wrap_content"
@@ -422,6 +450,48 @@
             android:textSize="14sp"
             android:textColor="#34495E"
             android:lineSpacingExtra="3dp" />
+
+        <!-- AI 調試 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="AI 調試"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnLogToggle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📋 睇 AI Log" />
+
+            <Button
+                android:id="@+id/btnSendLog"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="📤 發 Log 去 TG" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:textColor="#34495E"
+            android:visibility="gone" />
 
         <!-- 每日總結 -->
         <TextView
