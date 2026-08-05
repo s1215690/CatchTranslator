@@ -91,14 +91,15 @@ public class NudgeManager {
         });
     }
 
-    /** AI 拆步：3-5 個極微細步驟；冇 key 就當一步做。 */
+    /** AI 拆步：2-5 個極微細步驟（按任務複雜度）；失敗／單步就用本地通用模板，最少 2 步。 */
     private List<String> analyzeSteps(String raw) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String key = p.getString("api_key", "");
         if (!key.isEmpty()) {
             try {
                 String sys = "你係任務拆解器。用戶想做一件事：「" + raw.trim() + "」。"
-                        + "將佢拆成3-5個極微細、具體、一步一步嚟嘅動作步驟（每步2-10個字，例如：起身、行去洗手間、開水喉、刷牙、抹嘴）。"
+                        + "將佢拆成2-5個極微細、具體、一步一步嚟嘅動作步驟（每步2-12個字，例如：起身、行去洗手間、開水喉、刷牙、抹嘴）。"
+                        + "步驟數視任務而定：簡單任務拆2-3步，複雜任務先拆3-5步；唔好硬湊，但**最少要有2步，唔可以1步講完**。"
                         + "步驟要細到「冇動力嘅人都做到第一步」。"
                         + "只輸出JSON陣列，例如：[\"起身\",\"行去洗手間\",\"開水喉\",\"刷牙\"]";
                 String out = DeepSeekClient.chat(
@@ -115,14 +116,23 @@ public class NudgeManager {
                 JSONArray arr = new JSONArray(s);
                 for (int i = 0; i < arr.length() && res.size() < 5; i++) {
                     String step = arr.getString(i).trim();
-                    if (!step.isEmpty() && step.length() <= 12) res.add(step);
+                    if (!step.isEmpty() && step.length() <= 15) res.add(step);
                 }
                 if (res.size() >= 2) return res;
             } catch (Exception ignored) {}
         }
-        List<String> single = new ArrayList<>();
-        single.add(raw.trim());
-        return single;
+        return localSteps(raw);
+    }
+
+    /** 本地兜底拆步：AI 連唔到線／只出 1 步時用，確保唔會一句講完。 */
+    private List<String> localSteps(String raw) {
+        String t = raw.trim();
+        if (t.isEmpty()) t = "呢件事";
+        List<String> s = new ArrayList<>();
+        s.add("望住「" + t + "」，吸一啖氣");
+        s.add("開始做「" + t + "」嘅頭一步");
+        s.add("完成「" + t + "」");
+        return s;
     }
 
     private void showPopup() {
