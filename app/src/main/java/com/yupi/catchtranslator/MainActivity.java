@@ -199,7 +199,7 @@ public class MainActivity extends Activity {
             int n = id == R.id.rbBtn8 ? 8 : id == R.id.rbBtn10 ? 10 : 4;
             getSharedPreferences("settings", MODE_PRIVATE)
                     .edit().putInt("button_count", n).apply();
-            Toast.makeText(MainActivity.this, "按鈕數量改為 " + n + " 個——重新開啟懸浮面板生效", Toast.LENGTH_LONG).show();
+            Toast.makeText(MainActivity.this, "按鈕數量改為 " + n + " 個——下次打開面板自動生成", Toast.LENGTH_LONG).show();
         });
         llMiniMax.setVisibility("minimax".equals(voice) ? View.VISIBLE : View.GONE);
         boolean edge = "edge-hk".equals(voice) || "edge-cn".equals(voice);

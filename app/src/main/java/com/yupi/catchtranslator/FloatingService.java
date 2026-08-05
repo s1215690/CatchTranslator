@@ -301,8 +301,13 @@ public class FloatingService extends Service {
         wm.addView(panel, panelParams);
         panelOpen = true;
         ensureButtons();
+        boolean needRegen = false;
+        for (String b : currentButtons) {
+            if ("…".equals(b)) { needRegen = true; break; }
+        }
         wirePanel();
         renderButtons();
+        if (needRegen) regenerate(); // 佔位未就緒（啱改數量／服務啱開）就自動生成
     }
 
     private void closePanel() {

@@ -43,13 +43,19 @@
             android:padding="0dp" />
     </LinearLayout>
 
-    <!-- 按鈕動態生成：4 / 8 / 10 個，兩粒一行 -->
-    <LinearLayout
-        android:id="@+id/llButtons"
+    <!-- 按鈕動態生成：4 / 8 / 10 個，兩粒一行；太多時可以捲動 -->
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="vertical" />
+        android:maxHeight="340dp"
+        android:layout_marginTop="10dp">
+
+        <LinearLayout
+            android:id="@+id/llButtons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
 
     <LinearLayout
         android:id="@+id/llFollowup"
