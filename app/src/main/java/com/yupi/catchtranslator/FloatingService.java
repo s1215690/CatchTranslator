@@ -69,10 +69,10 @@ public class FloatingService extends Service {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService pool = Executors.newSingleThreadExecutor();
 
-    private Button[] btns = new Button[4];
     private TextView statusText;
     private EditText inputBox;
     private Button nudgeBtn;
+    private LinearLayout llButtons;
 
     private NudgeManager nudge;
     private boolean pendingNudge = false;
@@ -101,6 +101,7 @@ public class FloatingService extends Service {
         addCircle();
         regenerate();
         nudge = new NudgeManager(this, wm, nudgeCallback);
+        ensureButtons();
         // 語音引擎失敗時話畀用戶知，唔好靜雞雞用系統聲
         VoicePlayer.setFallbackListener((engine, reason) ->
                 setStatus(("edge-hk".equals(engine) || "edge-cn".equals(engine) ? "Edge" : "MiniMax")
@@ -299,6 +300,7 @@ public class FloatingService extends Service {
                 | WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN;
         wm.addView(panel, panelParams);
         panelOpen = true;
+        ensureButtons();
         wirePanel();
         renderButtons();
     }
@@ -313,10 +315,7 @@ public class FloatingService extends Service {
     }
 
     private void wirePanel() {
-        btns[0] = panel.findViewById(R.id.btn1);
-        btns[1] = panel.findViewById(R.id.btn2);
-        btns[2] = panel.findViewById(R.id.btn3);
-        btns[3] = panel.findViewById(R.id.btn4);
+        llButtons = panel.findViewById(R.id.llButtons);
         statusText = panel.findViewById(R.id.tvStatus);
         inputBox = panel.findViewById(R.id.etInput);
         View close = panel.findViewById(R.id.btnClose);
@@ -324,13 +323,6 @@ public class FloatingService extends Service {
         View mic = panel.findViewById(R.id.btnMic);
         View send = panel.findViewById(R.id.btnSend);
 
-        for (int i = 0; i < 4; i++) {
-            final String label = btns[i].getText().toString();
-            btns[i].setOnClickListener(v -> {
-                animateTap(v);
-                record(v instanceof TextView ? ((TextView) v).getText().toString() : label, "button");
-            });
-        }
         close.setOnClickListener(v -> closePanel());
         refresh.setOnClickListener(v -> regenerate());
         mic.setOnClickListener(v -> startVoice());
@@ -359,14 +351,55 @@ public class FloatingService extends Service {
         setStatus(base);
     }
 
+    /** 動態重建按鈕：兩粒一行，數量跟設定（4/8/10）。 */
     private void renderButtons() {
-        if (panel == null || btns[0] == null) return;
-        for (int i = 0; i < 4; i++) {
-            if (btns[i] != null) btns[i].setText(currentButtons[i]);
+        if (panel == null || llButtons == null) return;
+        llButtons.removeAllViews();
+        int n = currentButtons.length;
+        for (int i = 0; i < n; i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            int end = Math.min(i + 2, n);
+            for (int j = i; j < end; j++) {
+                final String label = currentButtons[j];
+                Button b = new Button(this);
+                b.setText(label);
+                b.setBackgroundResource(R.drawable.btn_bg);
+                b.setTextSize(13);
+                b.setTextColor(0xFF2E7D5B);
+                b.setMinHeight(dp(46));
+                b.setPadding(dp(4), 0, dp(4), 0);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                if (j > i) lp.setMarginStart(dp(6));
+                b.setLayoutParams(lp);
+                b.setOnClickListener(v -> {
+                    animateTap(v);
+                    record(((TextView) v).getText().toString(), "button");
+                });
+                row.addView(b);
+            }
+            llButtons.addView(row);
         }
     }
 
-    private String[] currentButtons = {"…", "…", "…", "…"};
+    /** 按鈕數量：設定入面揀 4/8/10。 */
+    private int buttonCount() {
+        int n = getSharedPreferences("settings", MODE_PRIVATE).getInt("button_count", 4);
+        return (n == 8 || n == 10) ? n : 4;
+    }
+
+    private void ensureButtons() {
+        int n = buttonCount();
+        if (currentButtons.length != n) {
+            currentButtons = new String[n];
+            for (int i = 0; i < n; i++) currentButtons[i] = "…";
+        }
+    }
+
+    private String[] currentButtons = new String[4];
 
     private void setStatus(final String s) {
         ui.post(() -> {
@@ -423,7 +456,7 @@ public class FloatingService extends Service {
 
     /** 用 AI 一次過生成嘅新按鈕換走舊按鈕。 */
     private void applyButtons(List<String> buttons) {
-        if (buttons == null || buttons.size() != 4) return;
+        if (buttons == null || buttons.size() != buttonCount()) return;
         currentButtons = buttons.toArray(new String[0]);
         renderButtons();
     }

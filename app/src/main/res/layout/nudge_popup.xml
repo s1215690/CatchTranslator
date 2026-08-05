@@ -14,7 +14,7 @@
         android:text="🚀 推動力"
         android:textSize="15sp"
         android:textStyle="bold"
-        android:textColor="#2C3E50" />
+        android:textColor="#2E7D5B" />
 
     <TextView
         android:id="@+id/tvNudgePhrase"
@@ -22,7 +22,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:textSize="14sp"
-        android:textColor="#34495E" />
+        android:textColor="#4A6E5F" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -30,7 +30,7 @@
         android:layout_marginTop="4dp"
         android:text="一步一推：做咗呢步就推下一步，唔想就撳掣取消"
         android:textSize="11sp"
-        android:textColor="#7F8C8D" />
+        android:textColor="#7FA88F" />
 
     <LinearLayout
         android:layout_width="match_parent"

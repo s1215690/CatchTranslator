@@ -94,8 +94,14 @@ public class AiEngine {
             "啱啱諗起醜事", "我值唔值得", "身體好攰", "想郁但郁唔到",
     };
 
+    /** 按鈕數量：設定入面揀 4/8/10。 */
+    public static int buttonCount(Context ctx) {
+        int n = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("button_count", 4);
+        return (n == 8 || n == 10) ? n : 4;
+    }
+
     /** 本地 fallback：按關鍵字粗略分類，再隨機揀回應（唔會用「收到／記低」式應答）。 */
-    public static Response fallback(String text, boolean narration) {
+    public static Response fallback(String text, boolean narration, int count) {
         String type = "other";
         String[] pool = FB_OTHER;
         if (text.contains("廢") || text.contains("唔配") || text.contains("失敗")
@@ -132,7 +138,7 @@ public class AiEngine {
         if (narration) reply = toNarration(reply);
         // 語氣：安慰／抽離／沉重用 calm，普通共情用自然
         String emo = ("feeling".equals(type) || "other".equals(type)) ? "" : "calm";
-        return new Response(type, reply, fallbackButtons(), emo);
+        return new Response(type, reply, fallbackButtons(count), emo);
     }
 
     /** 旁白模式：將「你」改做「佢」，拉開觀察距離。 */
@@ -140,10 +146,11 @@ public class AiEngine {
         return s.replace("你哋", "佢哋").replace("你", "佢");
     }
 
-    public static List<String> fallbackButtons() {
+    public static List<String> fallbackButtons(int count) {
         List<String> list = new ArrayList<>(Arrays.asList(FB_BUTTONS));
         Collections.shuffle(list, new Random(System.currentTimeMillis()));
-        return new ArrayList<>(list.subList(0, 4));
+        int n = Math.min(count, list.size());
+        return new ArrayList<>(list.subList(0, n));
     }
 
     /**
@@ -154,7 +161,8 @@ public class AiEngine {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String key = p.getString("api_key", "");
         boolean narration = p.getBoolean("narration_enabled", false);
-        DebugLog.add("AI", "輸入: " + truncate(text, 100) + " | narration=" + narration + " | 有key=" + !key.isEmpty());
+        int btnCount = buttonCount(ctx);
+        DebugLog.add("AI", "輸入: " + truncate(text, 100) + " | narration=" + narration + " | 有key=" + !key.isEmpty() + " | 按鈕數=" + btnCount);
         if (!key.isEmpty()) {
             try {
                 String sys = "你係「YupiSaver」嘅即時回應引擎。你要服務嘅用戶，長期被內在機制困住，你要按佢嘅情況回應：\n"
@@ -206,7 +214,7 @@ public class AiEngine {
                 DebugLog.add("AI", "異常: " + e.getClass().getSimpleName() + " " + truncate(e.getMessage(), 100) + " → fallback");
             }
         }
-        return fallback(text, narration);
+        return fallback(text, narration, btnCount);
     }
 
     /** 單行回應（反駁／問題等）。冇 key 或者連唔到線就畀一句兜底。 */
@@ -230,7 +238,8 @@ public class AiEngine {
     public static List<String> generateButtons(Context ctx) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String key = p.getString("api_key", "");
-        if (key.isEmpty()) return fallbackButtons();
+        int btnCount = buttonCount(ctx);
+        if (key.isEmpty()) return fallbackButtons(btnCount);
 
         String now = nowTime();
         String dow = new SimpleDateFormat("EEEE", Locale.CHINA).format(new Date()).replace("星期", "");
@@ -241,10 +250,10 @@ public class AiEngine {
 
         String sys = "你係「捉翻譯官」心理輔助工具嘅按鈕生成器。用戶心裡面有幾個內在聲音："
                 + "「翻譯官」=冷淡化一切善意嘅批判聲；「溫柔看守」=用安全做餌叫佢「坐喺度就唔會受傷」嘅聲音；「破壞者」=剝奪快樂嘅聲音。"
-                + "你要根據用戶而家嘅情境，生成4個按鈕文字，等用戶一撳就記錄到佢而家嘅狀態。"
+                + "你要根據用戶而家嘅情境，生成" + btnCount + "個按鈕文字，等用戶一撳就記錄到佢而家嘅狀態。"
                 + "按鈕可以係：捕捉翻譯官啱啱講嘅嘢、溫柔看守嘅勸誘、冇動力嘅感覺、真實感受、或者覺得自己唔重要嘅諗法。"
                 + "規則：廣東話口語、4-10個字、具體、唔好用「你應該」「你必須」、唔好命令式、唔好講教、唔好重複。"
-                + "只輸出一個JSON陣列，唔好加任何其他文字，例如：[\"佢又話我唔配\",\"坐喺度就安全\",\"我動唔到\",\"我對佢哋嚟講唔重要\"]";
+                + "只輸出一個JSON陣列（一定要有 " + btnCount + " 項），唔好加任何其他文字，例如：[\"佢又話我唔配\",\"坐喺度就安全\",\"我動唔到\",\"我對佢哋嚟講唔重要\"]";
 
         try {
             String out = DeepSeekClient.chat(
@@ -252,19 +261,19 @@ public class AiEngine {
                     key, p.getString("model", "deepseek-chat"), sys, ctxText, 800);
             JSONArray arr = parseArray(out);
             List<String> res = new ArrayList<>();
-            for (int i = 0; i < arr.length() && res.size() < 4; i++) {
+            for (int i = 0; i < arr.length() && res.size() < btnCount; i++) {
                 String s = arr.getString(i).trim();
                 if (!s.isEmpty() && s.length() <= 20) res.add(s);
             }
-            if (res.size() == 4) {
+            if (res.size() == btnCount) {
                 DebugLog.add("AI", "生成按鈕 OK: " + res);
                 return res;
             }
-            DebugLog.add("AI", "生成按鈕失敗(唔夠4個): " + res);
+            DebugLog.add("AI", "生成按鈕失敗(唔夠" + btnCount + "個): " + res);
         } catch (Exception e) {
             DebugLog.add("AI", "生成按鈕異常: " + e.getClass().getSimpleName());
         }
-        return fallbackButtons();
+        return fallbackButtons(btnCount);
     }
 
     private static String truncate(String s, int n) {

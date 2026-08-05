@@ -32,7 +32,7 @@ public class MainActivity extends Activity {
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
     private static final String[] EDGE_STYLE_VALUES = {"friendly", "", "cheerful", "serious"};
     private Button btnStart;
-    private RadioGroup rgSize, rgVoice, rgSpeed;
+    private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration;
     private EditText etMiniMaxKey;
     private Spinner spMiniMaxVoice, spMiniMaxModel, spMiniMaxEmotion;
@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
         btnStart = findViewById(R.id.btnStart);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
+        rgBtnCount = findViewById(R.id.rgBtnCount);
         rgSpeed = findViewById(R.id.rgSpeed);
         cbSummary = findViewById(R.id.cbSummary);
         cbNarration = findViewById(R.id.cbNarration);
@@ -192,6 +193,14 @@ public class MainActivity extends Activity {
         rgVoice.check("edge-hk".equals(voice) ? R.id.rbVoiceEdgeHk
                 : "edge-cn".equals(voice) ? R.id.rbVoiceEdgeCn
                 : "minimax".equals(voice) ? R.id.rbVoiceMiniMax : R.id.rbVoiceSystem);
+        int btnCount = p.getInt("button_count", 4);
+        rgBtnCount.check(btnCount == 8 ? R.id.rbBtn8 : btnCount == 10 ? R.id.rbBtn10 : R.id.rbBtn4);
+        rgBtnCount.setOnCheckedChangeListener((g, id) -> {
+            int n = id == R.id.rbBtn8 ? 8 : id == R.id.rbBtn10 ? 10 : 4;
+            getSharedPreferences("settings", MODE_PRIVATE)
+                    .edit().putInt("button_count", n).apply();
+            Toast.makeText(MainActivity.this, "按鈕數量改為 " + n + " 個——重新開啟懸浮面板生效", Toast.LENGTH_LONG).show();
+        });
         llMiniMax.setVisibility("minimax".equals(voice) ? View.VISIBLE : View.GONE);
         boolean edge = "edge-hk".equals(voice) || "edge-cn".equals(voice);
         llEdge.setVisibility(edge ? View.VISIBLE : View.GONE);

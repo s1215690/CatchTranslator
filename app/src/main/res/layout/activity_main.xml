@@ -16,7 +16,7 @@
             android:text="@string/app_name"
             android:textSize="26sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <TextView
             android:layout_width="match_parent"
@@ -24,7 +24,7 @@
             android:layout_marginTop="4dp"
             android:text="翻譯官一出聲，就撳個掣捉住佢。全部記錄只存喺手機。"
             android:textSize="13sp"
-            android:textColor="#7F8C8D" />
+            android:textColor="#7FA88F" />
 
         <!-- AI 設定 -->
         <TextView
@@ -34,7 +34,7 @@
             android:text="AI 設定"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <EditText
             android:id="@+id/etApiKey"
@@ -71,6 +71,9 @@
 
             <Button
                 android:id="@+id/btnSave"
+            android:background="@drawable/btn_primary_bg"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -78,6 +81,8 @@
 
             <Button
                 android:id="@+id/btnTest"
+            android:background="@drawable/btn_bg"
+            android:textColor="#2E7D5B"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -93,7 +98,7 @@
             android:text="調試（AI Log 發送去 Telegram）"
             android:textSize="13sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <EditText
             android:id="@+id/etDebugToken"
@@ -121,7 +126,45 @@
             android:text="懸浮按鈕"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="捕捉按鈕數量"
+            android:textSize="14sp"
+            android:textColor="#2E7D5B" />
+
+        <RadioGroup
+            android:id="@+id/rgBtnCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbBtn4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="4 個"
+                android:checked="true" />
+
+            <RadioButton
+                android:id="@+id/rbBtn8"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="8 個" />
+
+            <RadioButton
+                android:id="@+id/rbBtn10"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="10 個" />
+        </RadioGroup>
 
         <TextView
             android:id="@+id/tvOverlayStatus"
@@ -142,6 +185,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:background="@drawable/btn_primary_bg"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
                 android:text="開啟懸浮按鈕" />
 
             <Button
@@ -150,6 +196,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
+                android:background="@drawable/btn_bg"
+                android:textColor="#2E7D5B"
                 android:text="關閉" />
         </LinearLayout>
 
@@ -158,6 +206,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:background="@drawable/btn_bg"
+            android:textColor="#2E7D5B"
             android:text="開啟系統「懸浮權限」設定" />
 
         <!-- 面板大小 -->
@@ -168,7 +218,7 @@
             android:text="面板大小"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <RadioGroup
             android:id="@+id/rgSize"
@@ -206,7 +256,7 @@
             android:text="語音引擎"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <RadioGroup
             android:id="@+id/rgVoice"
@@ -279,7 +329,7 @@
                 android:layout_marginTop="2dp"
                 android:text="免費神經語音。語氣用音調微調：友好＝高少少、開朗＝再高啲、認真＝低沉。揀完直接撳「試聽語音」就得。"
                 android:textSize="12sp"
-                android:textColor="#7F8C8D" />
+                android:textColor="#7FA88F" />
         </LinearLayout>
 
         <LinearLayout
@@ -351,11 +401,13 @@
                 android:layout_marginTop="2dp"
                 android:text="MiniMax 用官方粵語聲線（Cantonese_ 開頭），自動講地道廣東話；揀咗 MiniMax 但冇入 Key 會自動用返系統語音。"
                 android:textSize="12sp"
-                android:textColor="#7F8C8D" />
+                android:textColor="#7FA88F" />
         </LinearLayout>
 
         <Button
             android:id="@+id/btnVoiceTest"
+            android:background="@drawable/btn_bg"
+            android:textColor="#2E7D5B"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -369,7 +421,7 @@
             android:text="語速"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <RadioGroup
             android:id="@+id/rgSpeed"
@@ -414,7 +466,7 @@
             android:text="回應風格"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <CheckBox
             android:id="@+id/cbNarration"
@@ -430,7 +482,7 @@
             android:layout_marginTop="2dp"
             android:text="關閉＝AI 直接同你講嘢；開啟＝AI 好似旁白咁描述你嘅一刻，幫你抽離。"
             android:textSize="12sp"
-            android:textColor="#7F8C8D" />
+            android:textColor="#7FA88F" />
 
         <!-- 統計儀錶盤 -->
         <TextView
@@ -440,7 +492,7 @@
             android:text="統計"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <TextView
             android:id="@+id/tvStats"
@@ -448,7 +500,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:textSize="14sp"
-            android:textColor="#34495E"
+            android:textColor="#4A6E5F"
             android:lineSpacingExtra="3dp" />
 
         <!-- AI 調試 -->
@@ -459,7 +511,7 @@
             android:text="AI 調試"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -469,6 +521,8 @@
 
             <Button
                 android:id="@+id/btnLogToggle"
+            android:background="@drawable/btn_bg"
+            android:textColor="#2E7D5B"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -476,6 +530,8 @@
 
             <Button
                 android:id="@+id/btnSendLog"
+            android:background="@drawable/btn_bg"
+            android:textColor="#2E7D5B"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -490,7 +546,7 @@
             android:layout_marginTop="6dp"
             android:textSize="11sp"
             android:fontFamily="monospace"
-            android:textColor="#34495E"
+            android:textColor="#4A6E5F"
             android:visibility="gone" />
 
         <!-- 每日總結 -->
@@ -501,7 +557,7 @@
             android:text="每日總結"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <CheckBox
             android:id="@+id/cbSummary"
@@ -516,7 +572,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:textSize="13sp"
-            android:textColor="#34495E" />
+            android:textColor="#4A6E5F" />
 
         <!-- 小米注意 -->
         <TextView
@@ -526,14 +582,14 @@
             android:text="小米／紅米（MIUI/HyperOS）注意"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:textSize="13sp"
-            android:textColor="#7F8C8D"
+            android:textColor="#7FA88F"
             android:lineSpacingExtra="3dp"
             android:text="1. 設定 → 應用設定 → 應用管理 → YupiSaver → 自啟動 → 允許。\n2. 設定 → 應用設定 → 應用管理 → YupiSaver → 省電策略 → 揀「無限制」。\n3. 設定 → 應用設定 → 應用管理 → YupiSaver → 通知管理 → 允許通知。\n4. 如果懸浮掣用用吓消失咗，返嚟呢頁撳「開啟懸浮按鈕」就得。\n\n（其他牌子手機通常淨係需要「懸浮權限」＋「允許通知」就得。）" />
 
@@ -545,7 +601,7 @@
             android:text="最近記錄"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#2C3E50" />
+            android:textColor="#2E7D5B" />
 
         <TextView
             android:id="@+id/tvRecords"
@@ -555,6 +611,6 @@
             android:layout_marginBottom="24dp"
             android:textSize="13sp"
             android:fontFamily="monospace"
-            android:textColor="#34495E" />
+            android:textColor="#4A6E5F" />
     </LinearLayout>
 </ScrollView>
