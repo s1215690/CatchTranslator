@@ -392,7 +392,7 @@ public class FloatingService extends Service {
             pool.execute(() -> {
                 final AiEngine.Response r = AiEngine.respond(this, text);
                 ui.post(() -> {
-                    VoicePlayer.speak(this, r.reply);
+                    VoicePlayer.speak(this, r.reply, r.emotion);
                     setStatus(counterLine() + "「" + text + "」｜" + r.reply);
                     applyButtons(r.buttons);
                     showFollowup(r.type, text);
@@ -412,7 +412,7 @@ public class FloatingService extends Service {
                 new TranslatorDb(this).insert(ch, text, source);
                 checkMilestone();
                 ui.post(() -> {
-                    VoicePlayer.speak(this, r.reply);
+                    VoicePlayer.speak(this, r.reply, r.emotion);
                     setStatus(counterLine() + "已記低（" + ch + "）：「" + text + "」｜" + r.reply);
                     applyButtons(r.buttons);
                     showFollowup(r.type, text);

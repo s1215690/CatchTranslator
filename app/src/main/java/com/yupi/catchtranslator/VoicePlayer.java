@@ -43,6 +43,11 @@ public class VoicePlayer {
     }
 
     public static void speak(final Context ctx, final String text) {
+        speak(ctx, text, null);
+    }
+
+    /** emotionOverride：AI 根據回應內容揀嘅語氣（""=自然 / calm / happy），空＝用設定值。 */
+    public static void speak(final Context ctx, final String text, final String emotionOverride) {
         if (text == null || text.isEmpty()) return;
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String engine = p.getString("voice_engine", "system");
@@ -69,7 +74,8 @@ public class VoicePlayer {
             final String mmKey = p.getString("minimax_key", "");
             final String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
             final String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
-            final String mmEmotion = p.getString("minimax_emotion", "");
+            final String mmEmotion = (emotionOverride != null && !emotionOverride.isEmpty())
+                    ? emotionOverride : p.getString("minimax_emotion", "");
             POOL.execute(() -> {
                 File out = cachedFile(ctx, text, mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
                 try {
