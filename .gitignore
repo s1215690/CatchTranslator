@@ -1,0 +1,23 @@
+# Android
+*.iml
+.gradle/
+.idea/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 本地配置与签名（含密码，严禁上传）
+local.properties
+keystore.properties
+release.keystore
+
+# 产物
+*.apk
+*.aab
+*.keystore
+
+# 系统
+.DS_Store
+Thumbs.db

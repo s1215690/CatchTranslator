@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="翻譯官一出聲，就撳個掣捉住佢。全部記錄只存喺手機。"
+            android:textSize="13sp"
+            android:textColor="#7F8C8D" />
+
+        <!-- AI 設定 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="AI 設定"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <EditText
+            android:id="@+id/etApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="DeepSeek API Key（sk-...）"
+            android:inputType="textPassword"
+            android:maxLines="1" />
+
+        <EditText
+            android:id="@+id/etModel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="模型（預設 deepseek-chat）"
+            android:inputType="text"
+            android:maxLines="1" />
+
+        <EditText
+            android:id="@+id/etBaseUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="API 地址（預設 https://api.deepseek.com）"
+            android:inputType="textUri"
+            android:maxLines="1" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="儲存設定" />
+
+            <Button
+                android:id="@+id/btnTest"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="測試連線" />
+        </LinearLayout>
+
+        <!-- 懸浮按鈕 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="懸浮按鈕"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <TextView
+            android:id="@+id/tvOverlayStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="14sp"
+            android:textColor="#E67E22" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnStart"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="開啟懸浮按鈕" />
+
+            <Button
+                android:id="@+id/btnStop"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="關閉" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnPerm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="開啟系統「懸浮權限」設定" />
+
+        <!-- 面板大小 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="面板大小"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <RadioGroup
+            android:id="@+id/rgSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbSizeSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="細（280）" />
+
+            <RadioButton
+                android:id="@+id/rbSizeMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="中（340）" />
+
+            <RadioButton
+                android:id="@+id/rbSizeLarge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="大（380）" />
+        </RadioGroup>
+
+        <!-- 語音引擎 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="語音引擎"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <RadioGroup
+            android:id="@+id/rgVoice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/rbVoiceSystem"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="系統語音（離線）" />
+
+            <RadioButton
+                android:id="@+id/rbVoiceEdgeHk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Microsoft 神經廣東話（最自然）" />
+
+            <RadioButton
+                android:id="@+id/rbVoiceEdgeCn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Microsoft 神經普通話（最自然）" />
+
+            <RadioButton
+                android:id="@+id/rbVoiceMiniMax"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MiniMax 海螺語音（最真實，按量收費）" />
+        </RadioGroup>
+
+        <LinearLayout
+            android:id="@+id/llEdge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Edge 聲線"
+                android:textSize="14sp" />
+
+            <Spinner
+                android:id="@+id/spEdgeVoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="語氣"
+                android:textSize="14sp" />
+
+            <Spinner
+                android:id="@+id/spEdgeStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="免費神經語音。語氣用音調微調：友好＝高少少、開朗＝再高啲、認真＝低沉。揀完直接撳「試聽語音」就得。"
+                android:textSize="12sp"
+                android:textColor="#7F8C8D" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/llMiniMax"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/etMiniMaxKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="MiniMax API Key（platform.minimaxi.com 控制台攞）"
+                android:inputType="text"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="聲線"
+                android:textSize="14sp" />
+
+            <Spinner
+                android:id="@+id/spMiniMaxVoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <CheckBox
+                android:id="@+id/cbMiniMaxTurbo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="用 Turbo 慳錢（2元/萬字符，HD 係 3.5元/萬字符）"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="模型"
+                android:textSize="14sp" />
+
+            <Spinner
+                android:id="@+id/spMiniMaxModel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="語氣"
+                android:textSize="14sp" />
+
+            <Spinner
+                android:id="@+id/spMiniMaxEmotion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="MiniMax 用官方粵語聲線（Cantonese_ 開頭），自動講地道廣東話；揀咗 MiniMax 但冇入 Key 會自動用返系統語音。"
+                android:textSize="12sp"
+                android:textColor="#7F8C8D" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnVoiceTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="試聽語音" />
+
+        <!-- 語速 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="語速"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <RadioGroup
+            android:id="@+id/rgSpeed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbSpeedSlow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="慢" />
+
+            <RadioButton
+                android:id="@+id/rbSpeedNormal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="正常" />
+
+            <RadioButton
+                android:id="@+id/rbSpeedFast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="快" />
+
+            <RadioButton
+                android:id="@+id/rbSpeedVeryFast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="好快" />
+        </RadioGroup>
+
+        <!-- 統計儀錶盤 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="統計"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <TextView
+            android:id="@+id/tvStats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="14sp"
+            android:textColor="#34495E"
+            android:lineSpacingExtra="3dp" />
+
+        <!-- 每日總結 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="每日總結"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <CheckBox
+            android:id="@+id/cbSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="每日 00:01 自動總結尋日（需要 AI Key；冇 Key 會出簡單統計）" />
+
+        <TextView
+            android:id="@+id/tvSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp"
+            android:textColor="#34495E" />
+
+        <!-- 小米注意 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="小米／紅米（MIUI/HyperOS）注意"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="13sp"
+            android:textColor="#7F8C8D"
+            android:lineSpacingExtra="3dp"
+            android:text="1. 設定 → 應用設定 → 應用管理 → YupiSaver → 自啟動 → 允許。\n2. 設定 → 應用設定 → 應用管理 → YupiSaver → 省電策略 → 揀「無限制」。\n3. 設定 → 應用設定 → 應用管理 → YupiSaver → 通知管理 → 允許通知。\n4. 如果懸浮掣用用吓消失咗，返嚟呢頁撳「開啟懸浮按鈕」就得。\n\n（其他牌子手機通常淨係需要「懸浮權限」＋「允許通知」就得。）" />
+
+        <!-- 記錄 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="最近記錄"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <TextView
+            android:id="@+id/tvRecords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="24dp"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:textColor="#34495E" />
+    </LinearLayout>
+</ScrollView>

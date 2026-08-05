@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/panel_bg"
+    android:elevation="12dp"
+    android:padding="12dp"
+    android:layout_margin="8dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🚀 推動力"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#2C3E50" />
+
+    <TextView
+        android:id="@+id/tvNudgePhrase"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="14sp"
+        android:textColor="#34495E" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="一步一推：做咗呢步就推下一步，唔想就撳掣取消"
+        android:textSize="11sp"
+        android:textColor="#7F8C8D" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnNudgeDone"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="做咗喇 ✅"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnNudgeCancel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="取消"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

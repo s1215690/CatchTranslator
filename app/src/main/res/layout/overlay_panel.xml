@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/panel_bg"
+    android:elevation="12dp"
+    android:padding="12dp"
+    android:layout_margin="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🎧 YupiSaver"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#2C3E50" />
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:layout_width="44dp"
+            android:layout_height="40dp"
+            android:text="🔄"
+            android:textSize="14sp"
+            android:background="@drawable/btn_bg"
+            android:padding="0dp" />
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="44dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:text="✕"
+            android:textSize="14sp"
+            android:background="@drawable/btn_bg"
+            android:padding="0dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+
+        <Button
+            android:id="@+id/btn2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+
+        <Button
+            android:id="@+id/btn4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/llFollowup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btnFollow1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+
+        <Button
+            android:id="@+id/btnFollow2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_bg"
+            android:minHeight="44dp"
+            android:textSize="13sp"
+            android:text="…" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <Button
+            android:id="@+id/btnMic"
+            android:layout_width="48dp"
+            android:layout_height="44dp"
+            android:text="🎤"
+            android:textSize="16sp"
+            android:background="@drawable/btn_bg"
+            android:padding="0dp" />
+
+        <EditText
+            android:id="@+id/etInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:hint="或者打字都得…"
+            android:maxLines="2"
+            android:inputType="text"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnSend"
+            android:layout_width="52dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:text="送出"
+            android:textSize="13sp"
+            android:background="@drawable/btn_bg"
+            android:padding="0dp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnNudge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/btn_bg"
+        android:minHeight="44dp"
+        android:text="🚀 推動力：想做咩？講出嚟"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textSize="12sp"
+        android:textColor="#7F8C8D" />
+</LinearLayout>
