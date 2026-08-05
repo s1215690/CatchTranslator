@@ -404,8 +404,11 @@ public class FloatingService extends Service {
             pool.execute(() -> {
                 final AiEngine.Response r = AiEngine.respond(this, text);
                 final String ch = "critic".equals(r.type) ? "翻譯官"
+                        : "guardian".equals(r.type) ? "看守"
+                        : "stuck".equals(r.type) ? "冇力"
                         : "feeling".equals(r.type) ? "真我"
-                        : "action".equals(r.type) ? "行動" : "文字";
+                        : "worth".equals(r.type) ? "自我懷疑"
+                        : "文字";
                 new TranslatorDb(this).insert(ch, text, source);
                 checkMilestone();
                 ui.post(() -> {
@@ -465,12 +468,17 @@ public class FloatingService extends Service {
             btnFollow2.setText("📋 記低就算");
             btnFollow1.setOnClickListener(v -> counterArgument(buttonText));
             btnFollow2.setOnClickListener(v -> recordOnly(buttonText));
-        } else if ("action".equals(type)) {
-            btnFollow1.setText("✅ 做咗");
-            btnFollow2.setText("💤 遲啲先");
+        } else if ("stuck".equals(type)) {
+            btnFollow1.setText("✅ 郁咗一下");
+            btnFollow2.setText("💤 唔郁都得");
             btnFollow1.setOnClickListener(v -> actionDone(buttonText));
             btnFollow2.setOnClickListener(v -> actionLater(buttonText));
         } else if ("feeling".equals(type)) {
+            btnFollow1.setText("💬 講多啲");
+            btnFollow2.setText("📋 記低就算");
+            btnFollow1.setOnClickListener(v -> exploreMore(buttonText));
+            btnFollow2.setOnClickListener(v -> recordOnly(buttonText));
+        } else if ("guardian".equals(type) || "worth".equals(type)) {
             btnFollow1.setText("💬 講多啲");
             btnFollow2.setText("📋 記低就算");
             btnFollow1.setOnClickListener(v -> exploreMore(buttonText));
@@ -505,22 +513,22 @@ public class FloatingService extends Service {
         });
     }
 
-    /** ✅ 做咗：記低完成，講句讚。 */
+    /** ✅ 郁咗一下：記低，講句讚（唔逼，郁到就贏）。 */
     private void actionDone(final String buttonText) {
         hideFollowup();
         new TranslatorDb(this).insert("行動完成", buttonText, "followup");
         VoicePlayer.speak(this, pick(new String[]{
-                "好嘢！話到做到！", "做咗就係贏！", "好，完成咗一件事。"}));
-        setStatus("完成：「" + buttonText + "」🎉");
+                "好，郁咗一下，話到做到！", "郁到就係贏！", "好，今次郁咗，下次都會郁到嘅。"}));
+        setStatus("郁咗一下：「" + buttonText + "」");
     }
 
-    /** 💤 遲啲先：記低，唔逼。 */
+    /** 💤 唔郁都得：記低，唔逼。 */
     private void actionLater(final String buttonText) {
         hideFollowup();
         new TranslatorDb(this).insert("行動未做", buttonText, "followup");
         VoicePlayer.speak(this, pick(new String[]{
-                "冇所謂，想嘅時候再嚟。", "遲啲先都得，唔使逼自己。"}));
-        setStatus("記低咗：「" + buttonText + "」——遲啲先");
+                "唔郁都得，想郁先郁。", "冇所謂，你肯認得嗰個看守就夠喇。"}));
+        setStatus("記低咗：「" + buttonText + "」——唔郁都得");
     }
 
     /** 💬 講多啲：AI 問一條溫柔、具體嘅問題。 */
