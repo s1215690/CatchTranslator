@@ -258,7 +258,7 @@ public class AiEngine {
         try {
             String out = DeepSeekClient.chat(
                     p.getString("base_url", "https://api.deepseek.com"),
-                    key, p.getString("model", "deepseek-chat"), sys, ctxText, 800);
+                    key, p.getString("model", "deepseek-chat"), sys, ctxText, 800, false); // 非思考模式：生成按鈕要快
             JSONArray arr = parseArray(out);
             List<String> res = new ArrayList<>();
             for (int i = 0; i < arr.length() && res.size() < btnCount; i++) {

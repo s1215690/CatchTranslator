@@ -15,14 +15,19 @@ import java.nio.charset.StandardCharsets;
 public class DeepSeekClient {
 
     public static String chat(String baseUrl, String apiKey, String model, String system, String user) throws Exception {
-        return chat(baseUrl, apiKey, model, system, user, 500);
+        return chat(baseUrl, apiKey, model, system, user, 500, true);
+    }
+
+    public static String chat(String baseUrl, String apiKey, String model, String system, String user, int maxTokens) throws Exception {
+        return chat(baseUrl, apiKey, model, system, user, maxTokens, true);
     }
 
     /**
-     * 呼叫 chat/completions。帶思考嘅推理模型（如 deepseek-v4-flash）會先寫 reasoning_content，
-     * max_tokens 唔夠會令 content 空——所以 content 空時會自動加大 token 重試（最多 2 次）。
+     * 呼叫 chat/completions。
+     * thinking=false 時傳 {"thinking":{"type":"disabled"}}——deepseek-v4 系支持非思考模式，快好多（用嚟生成按鈕）。
+     * 帶思考時 reasoning_content 會食 token，content 空會自動加大重試（最多 2 次）。
      */
-    public static String chat(String baseUrl, String apiKey, String model, String system, String user, int maxTokens) throws Exception {
+    public static String chat(String baseUrl, String apiKey, String model, String system, String user, int maxTokens, boolean thinking) throws Exception {
         String url = baseUrl;
         if (!url.endsWith("/")) url += "/";
         url += "chat/completions";
@@ -43,7 +48,12 @@ public class DeepSeekClient {
         msgs.put(new JSONObject().put("role", "system").put("content", system));
         msgs.put(new JSONObject().put("role", "user").put("content", user));
         body.put("messages", msgs);
-        body.put("temperature", 1.1);
+        if (thinking) {
+            body.put("temperature", 1.1);
+        } else {
+            // 非思考模式：快、平，用嚟生成按鈕選項
+            body.put("thinking", new JSONObject().put("type", "disabled"));
+        }
         body.put("max_tokens", maxTokens);
 
         byte[] data = body.toString().getBytes(StandardCharsets.UTF_8);
