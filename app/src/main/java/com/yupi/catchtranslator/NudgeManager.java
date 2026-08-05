@@ -104,7 +104,9 @@ public class NudgeManager {
                         + "只輸出JSON陣列，例如：[\"起身\",\"行去洗手間\",\"開水喉\",\"刷牙\"]";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
-                        key, p.getString("model", "deepseek-chat"), sys, "幫我拆步。", 800).trim();
+                        key, p.getString("model", "deepseek-chat"), sys, "幫我拆步。", 800,
+                        ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                                .getBoolean("thinking_enabled", true)).trim();
                 List<String> res = new ArrayList<>();
                 String s = out.trim();
                 if (s.startsWith("```")) {
@@ -239,7 +241,9 @@ public class NudgeManager {
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
                         key, p.getString("model", "deepseek-chat"),
-                        sys, "請生成第" + (stepIdx + 1) + "步第" + stepAttempt + "句。", 800).trim();
+                        sys, "請生成第" + (stepIdx + 1) + "步第" + stepAttempt + "句。", 800,
+                        ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                                .getBoolean("thinking_enabled", true)).trim();
                 if (!out.isEmpty() && out.length() <= 30) {
                     usedPhrases.add(out);
                     return out;

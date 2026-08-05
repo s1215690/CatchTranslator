@@ -94,6 +94,12 @@ public class AiEngine {
             "啱啱諗起醜事", "我值唔值得", "身體好攰", "想郁但郁唔到",
     };
 
+    /** 整體思考模式開關：設定入面揀（預設開）。生成按鈕唔受影響（永遠非思考，要快）。 */
+    public static boolean thinking(Context ctx) {
+        return ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean("thinking_enabled", true);
+    }
+
     /** 按鈕數量：設定入面揀 4/8/10。 */
     public static int buttonCount(Context ctx) {
         int n = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("button_count", 4);
@@ -188,7 +194,7 @@ public class AiEngine {
                         + "只輸出JSON：{\"type\":\"critic\",\"emotion\":\"calm\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\",\"...\",\"...\"]}";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
-                        key, p.getString("model", "deepseek-chat"), sys, "生成回應。", 1200);
+                        key, p.getString("model", "deepseek-chat"), sys, "生成回應。", 1200, thinking(ctx));
                 JSONObject j = new JSONObject(extractJson(out));
                 String type = j.optString("type", "other");
                 String reply = j.optString("reply", "").trim();
@@ -225,7 +231,7 @@ public class AiEngine {
         try {
             String out = DeepSeekClient.chat(
                     p.getString("base_url", "https://api.deepseek.com"),
-                    key, p.getString("model", "deepseek-chat"), sys, userMsg).trim();
+                    key, p.getString("model", "deepseek-chat"), sys, userMsg, 500, thinking(ctx)).trim();
             DebugLog.add("AI", "oneLine 返回: " + truncate(out, 80));
             if (!out.isEmpty() && out.length() <= 60) return out;
         } catch (Exception e) {

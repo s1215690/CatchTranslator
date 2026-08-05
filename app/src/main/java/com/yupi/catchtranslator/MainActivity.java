@@ -33,7 +33,7 @@ public class MainActivity extends Activity {
     private static final String[] EDGE_STYLE_VALUES = {"friendly", "", "cheerful", "serious"};
     private Button btnStart;
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
-    private CheckBox cbSummary, cbNarration;
+    private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
     private Spinner spMiniMaxVoice, spMiniMaxModel, spMiniMaxEmotion;
     private LinearLayout llMiniMax;
@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
         rgSpeed = findViewById(R.id.rgSpeed);
         cbSummary = findViewById(R.id.cbSummary);
         cbNarration = findViewById(R.id.cbNarration);
+        cbThinking = findViewById(R.id.cbThinking);
         etMiniMaxKey = findViewById(R.id.etMiniMaxKey);
         spMiniMaxVoice = findViewById(R.id.spMiniMaxVoice);
         spMiniMaxModel = findViewById(R.id.spMiniMaxModel);
@@ -149,6 +150,10 @@ public class MainActivity extends Activity {
         cbNarration.setOnCheckedChangeListener((b, checked) ->
                 getSharedPreferences("settings", MODE_PRIVATE)
                         .edit().putBoolean("narration_enabled", checked).apply());
+        cbThinking.setChecked(p.getBoolean("thinking_enabled", true));
+        cbThinking.setOnCheckedChangeListener((b, checked) ->
+                getSharedPreferences("settings", MODE_PRIVATE)
+                        .edit().putBoolean("thinking_enabled", checked).apply());
         findViewById(R.id.btnVoiceTest).setOnClickListener(v -> {
             save(); // 先儲存再試聽，唔使怕漏撳儲存掣
             VoicePlayer.speak(this, "你好，我係 YupiSaver。今日想試下呢把聲得唔得。");
@@ -278,6 +283,7 @@ public class MainActivity extends Activity {
                 .putString("edge_style",
                         EDGE_STYLE_VALUES[Math.max(0, spEdgeStyle.getSelectedItemPosition())])
                 .putBoolean("narration_enabled", cbNarration.isChecked())
+                .putBoolean("thinking_enabled", cbThinking.isChecked())
                 .apply();
         Toast.makeText(this, "已儲存", Toast.LENGTH_SHORT).show();
     }
