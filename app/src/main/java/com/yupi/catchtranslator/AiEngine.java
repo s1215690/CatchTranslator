@@ -172,7 +172,7 @@ public class AiEngine {
                         + "只輸出JSON：{\"type\":\"critic\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\",\"...\",\"...\"]}";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
-                        key, p.getString("model", "deepseek-chat"), sys, "生成回應。", 500);
+                        key, p.getString("model", "deepseek-chat"), sys, "生成回應。", 1200);
                 JSONObject j = new JSONObject(extractJson(out));
                 String type = j.optString("type", "other");
                 String reply = j.optString("reply", "").trim();
@@ -239,7 +239,7 @@ public class AiEngine {
         try {
             String out = DeepSeekClient.chat(
                     p.getString("base_url", "https://api.deepseek.com"),
-                    key, p.getString("model", "deepseek-chat"), sys, ctxText);
+                    key, p.getString("model", "deepseek-chat"), sys, ctxText, 800);
             JSONArray arr = parseArray(out);
             List<String> res = new ArrayList<>();
             for (int i = 0; i < arr.length() && res.size() < 4; i++) {

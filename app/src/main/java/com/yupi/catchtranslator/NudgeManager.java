@@ -36,13 +36,13 @@ public class NudgeManager {
     private static final long INTERVAL_MS = 60_000;
     private static final int MAX_PER_STEP = 3;
     private static final String[] FALLBACK = {
-            "而家去做「%s」啦，好快㗎",
-            "準備做「%s」未？一分鐘就夠",
-            "做咗「%s」，個感覺會好好多㗎",
-            "「%s」其實好簡單㗎，試下啦",
-            "記得「%s」呀，我等你",
-            "同我一齊去做「%s」好冇？",
-            "「%s」做完就可以鬆返，去吧",
+            "而家試下：%s",
+            "唔使急，慢慢嚟：%s",
+            "得閒就做：%s",
+            "%s——做咗就當贏",
+            "試下啦：%s，一分鐘就夠",
+            "記得：%s，我等你",
+            "%s，做完就可以鬆返",
     };
     private static final String[] STEP_PRAISE = {
             "好，呢步搞掂！", "得咗！繼續下一步。", "好叻，郁到喇！", "正！一步一步嚟。",
@@ -104,7 +104,7 @@ public class NudgeManager {
                         + "只輸出JSON陣列，例如：[\"起身\",\"行去洗手間\",\"開水喉\",\"刷牙\"]";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
-                        key, p.getString("model", "deepseek-chat"), sys, "幫我拆步。").trim();
+                        key, p.getString("model", "deepseek-chat"), sys, "幫我拆步。", 800).trim();
                 List<String> res = new ArrayList<>();
                 String s = out.trim();
                 if (s.startsWith("```")) {
@@ -239,7 +239,7 @@ public class NudgeManager {
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
                         key, p.getString("model", "deepseek-chat"),
-                        sys, "請生成第" + (stepIdx + 1) + "步第" + stepAttempt + "句。").trim();
+                        sys, "請生成第" + (stepIdx + 1) + "步第" + stepAttempt + "句。", 800).trim();
                 if (!out.isEmpty() && out.length() <= 30) {
                     usedPhrases.add(out);
                     return out;

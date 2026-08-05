@@ -15,9 +15,13 @@ import java.nio.charset.StandardCharsets;
 public class DeepSeekClient {
 
     public static String chat(String baseUrl, String apiKey, String model, String system, String user) throws Exception {
-        return chat(baseUrl, apiKey, model, system, user, 250);
+        return chat(baseUrl, apiKey, model, system, user, 500);
     }
 
+    /**
+     * 呼叫 chat/completions。帶思考嘅推理模型（如 deepseek-v4-flash）會先寫 reasoning_content，
+     * max_tokens 唔夠會令 content 空——所以 content 空時會自動加大 token 重試（最多 2 次）。
+     */
     public static String chat(String baseUrl, String apiKey, String model, String system, String user, int maxTokens) throws Exception {
         String url = baseUrl;
         if (!url.endsWith("/")) url += "/";
@@ -56,7 +60,13 @@ public class DeepSeekClient {
             throw new Exception("API 錯誤 " + code + ": " + truncate(resp, 200));
         }
         JSONObject j = new JSONObject(resp);
-        return j.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        String content = j.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        if (content != null && content.trim().isEmpty() && maxTokens < 3000) {
+            // 思考模型食晒 token：加大再試一次（避免無限遞歸，3000 封頂）
+            DebugLog.add("DS", "content 空（reasoning 食晒 token），加大到 " + (maxTokens * 2) + " 重試");
+            return chat(baseUrl, apiKey, model, system, user, Math.min(3000, maxTokens * 2));
+        }
+        return content == null ? "" : content;
     }
 
     private static String readAll(InputStream is) throws Exception {

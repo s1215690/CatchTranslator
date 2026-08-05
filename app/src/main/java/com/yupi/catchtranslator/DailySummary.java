@@ -131,7 +131,7 @@ public class DailySummary {
             String user = "日期：" + date + "\n記錄：\n"
                     + TextUtils.join("\n", recs.subList(0, Math.min(recs.size(), 40)));
             String out = DeepSeekClient.chat(p.getString("base_url", "https://api.deepseek.com"),
-                    key, p.getString("model", "deepseek-chat"), sys, user, 500).trim();
+                    key, p.getString("model", "deepseek-chat"), sys, user, 1000).trim();
             JSONObject j = new JSONObject(AiEngine.extractJson(out));
             String summary = j.optString("summary", "").trim();
             String nextTask = j.optString("next_task", "").trim();
@@ -193,7 +193,7 @@ public class DailySummary {
                         + "只輸出JSON：{\"summary\":\"...\",\"theme\":\"...\"}";
                 String user = "過去7日記錄：\n" + TextUtils.join("\n", recs.subList(0, Math.min(recs.size(), 60)));
                 String out = DeepSeekClient.chat(p.getString("base_url", "https://api.deepseek.com"),
-                        key, p.getString("model", "deepseek-chat"), sys, user, 700).trim();
+                        key, p.getString("model", "deepseek-chat"), sys, user, 1200).trim();
                 JSONObject j = new JSONObject(AiEngine.extractJson(out));
                 String s = j.optString("summary", "").trim();
                 if (!s.isEmpty()) {
