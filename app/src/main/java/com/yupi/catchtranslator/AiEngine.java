@@ -189,7 +189,7 @@ public class AiEngine {
                         + "\n做三件事：\n"
                         + "1. 判斷類型：critic=翻譯官批判聲（「佢又話我唔配」「我覺得自己好懶」）；guardian=溫柔看守／安全陷阱（「坐喺度就安全」「唔好郁就冇事」）；stuck=冇動力／僵住（「我動唔到」「唔想覆信息」）；feeling=真實感受／身體狀態（「心口好實」）；worth=覺得自己唔重要／值唔值得（「我對佢哋嚟講唔重要」）；other=其他。\n"
                         + "2. 用廣東話寫30-80字嘅回應，跟足上面原則。\n"
-                        + "3. 生成 4 個新按鈕文字（廣東話口語、4-10個字、具體、唔好命令式、唔好重複現有按鈕），捕捉佢下一個狀態。\n"
+                        + "3. 生成 " + btnCount + " 個新按鈕文字（廣東話口語、4-10個字、具體、唔好命令式、唔好重複現有按鈕；最少 4 個，最多 " + btnCount + " 個），捕捉佢下一個狀態。\n"
                         + "4. 判斷語氣 emotion：根據回應嘅情感色彩揀——安慰／抽離／沉重用「calm」，鼓勵／慶祝／輕鬆用「happy」，普通共情用「」（空，自然）。只可以係 \"\"、\"calm\"、\"happy\" 三揀一。\n"
                         + "只輸出JSON：{\"type\":\"critic\",\"emotion\":\"calm\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\",\"...\",\"...\"]}";
                 String out = DeepSeekClient.chat(
@@ -204,11 +204,12 @@ public class AiEngine {
                 JSONArray arr = j.optJSONArray("buttons");
                 if (arr != null) {
                     buttons = new ArrayList<>();
-                    for (int i = 0; i < arr.length() && buttons.size() < 4; i++) {
+                    for (int i = 0; i < arr.length() && buttons.size() < btnCount; i++) {
                         String s = arr.getString(i).trim();
                         if (!s.isEmpty() && s.length() <= 20) buttons.add(s);
                     }
-                    if (buttons.size() != 4) buttons = null;
+                    // 4~N 個都接受；唔夠 4 個就唔換（保持原按鈕）
+                    if (buttons.size() < 4) buttons = null;
                 }
                 if (!reply.isEmpty() && reply.length() <= 150) {
                     DebugLog.add("AI", "解析 OK: type=" + type + " | emotion=" + emotion + " | reply=" + truncate(reply, 80)

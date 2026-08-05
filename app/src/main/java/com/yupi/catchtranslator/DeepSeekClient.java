@@ -50,6 +50,7 @@ public class DeepSeekClient {
         body.put("messages", msgs);
         if (thinking) {
             body.put("temperature", 1.1);
+            body.put("reasoning_effort", "low"); // 官方參數：思考強度 low，快好多（quality 略降可接受）
         } else {
             // 非思考模式：快、平，用嚟生成按鈕選項
             body.put("thinking", new JSONObject().put("type", "disabled"));
@@ -71,10 +72,15 @@ public class DeepSeekClient {
         }
         JSONObject j = new JSONObject(resp);
         String content = j.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-        if (content != null && content.trim().isEmpty() && maxTokens < 3000) {
-            // 思考模型食晒 token：加大再試一次（避免無限遞歸，3000 封頂）
-            DebugLog.add("DS", "content 空（reasoning 食晒 token），加大到 " + (maxTokens * 2) + " 重試");
-            return chat(baseUrl, apiKey, model, system, user, Math.min(3000, maxTokens * 2));
+        if (content != null && content.trim().isEmpty()) {
+            if (thinking) {
+                // 思考食晒 token：直接改非思考重試（快，唔使再諗一輪）
+                DebugLog.add("DS", "content 空（reasoning 食晒），改非思考重試");
+                return chat(baseUrl, apiKey, model, system, user, maxTokens, false);
+            } else if (maxTokens < 3000) {
+                DebugLog.add("DS", "content 空，加大到 " + (maxTokens * 2) + " 重試");
+                return chat(baseUrl, apiKey, model, system, user, Math.min(3000, maxTokens * 2), false);
+            }
         }
         return content == null ? "" : content;
     }
