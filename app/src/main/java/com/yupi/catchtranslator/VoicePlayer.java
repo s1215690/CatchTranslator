@@ -59,6 +59,8 @@ public class VoicePlayer {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String engine = p.getString("voice_engine", "system");
         final String ratePct = p.getString("voice_rate", "0");
+        DebugLog.add("TTS", "speak: engine=" + engine + " | len=" + text.length()
+                + " | emotion=" + emotionOverride + " | tag=" + tag);
         if ("edge-hk".equals(engine) || "edge-cn".equals(engine)) {
             final String edgeVoice = p.getString("edge_voice", "hk-f");
             final String voice = "hk-m".equals(edgeVoice) ? EdgeTts.VOICE_HK_M
@@ -68,11 +70,14 @@ public class VoicePlayer {
                 File out = cachedFile(ctx, text, voice + "|" + pitch, ratePct);
                 try {
                     if (!out.exists()) {
+                        DebugLog.add("TTS", "Edge 合成中: " + truncate(text, 50));
                         EdgeTts.synthesize(text, voice, ratePct, pitch, out);
                     }
                     final File f = out;
                     MAIN.post(() -> playFile(ctx, f, text, ratePct));
                 } catch (Exception e) {
+                    DebugLog.add("TTS", "Edge 失敗: " + truncate(e.getMessage(), 100));
+                    if (tryMiniMax(ctx, p, text, emotionOverride, tag, ratePct)) return; // 回退鏈
                     notifyFallback(engine, e.getMessage());
                     playSystem(ctx, text, ratePct);
                 }
@@ -88,11 +93,13 @@ public class VoicePlayer {
                 File out = cachedFile(ctx, finalText, mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
                 try {
                     if (!out.exists()) {
+                        DebugLog.add("TTS", "MiniMax 合成中: " + truncate(finalText, 50));
                         MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
                     }
                     final File f = out;
                     MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
                 } catch (Exception e) {
+                    DebugLog.add("TTS", "MiniMax 失敗: " + truncate(e.getMessage(), 100));
                     notifyFallback(engine, e.getMessage());
                     playSystem(ctx, text, ratePct);
                 }
@@ -108,6 +115,43 @@ public class VoicePlayer {
         if ("friendly".equals(style)) return "+6%";
         if ("serious".equals(style)) return "-8%";
         return "+0%";
+    }
+
+    /**
+     * 回退鏈：Edge 失敗嗰陣試 MiniMax（有 key 先用）。成功 return true。
+     * 因為系統 TTS 好多時冇粵語／未就緒，靜音就係咁嚟——所以中間加多一層。
+     */
+    private static boolean tryMiniMax(Context ctx, SharedPreferences p, String text,
+                                      String emotion, String tag, String ratePct) {
+        String mmKey = p.getString("minimax_key", "");
+        if (mmKey.isEmpty()) {
+            DebugLog.add("TTS", "回退 MiniMax: 冇 key，跳過");
+            return false;
+        }
+        try {
+            String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
+            String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
+            String mmEmotion = (emotion != null && !emotion.isEmpty())
+                    ? emotion : p.getString("minimax_emotion", "");
+            String finalText = MiniMaxTts.applyTag(text, tag);
+            File out = cachedFile(ctx, finalText, "mm-fb|" + mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
+            if (!out.exists()) {
+                DebugLog.add("TTS", "回退合成中（MiniMax）: " + truncate(finalText, 50));
+                MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
+            }
+            final File f = out;
+            MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
+            DebugLog.add("TTS", "Edge→MiniMax 回退成功");
+            return true;
+        } catch (Exception e2) {
+            DebugLog.add("TTS", "回退 MiniMax 失敗: " + truncate(e2.getMessage(), 100));
+            return false;
+        }
+    }
+
+    private static String truncate(String s, int n) {
+        if (s == null) return "null";
+        return s.length() > n ? s.substring(0, n) + "…" : s;
     }
 
     /** 按文字＋聲線＋語速做快取 key：同一句講過就唔使再合成。 */
@@ -149,7 +193,10 @@ public class VoicePlayer {
     private static void playSystem(final Context ctx, final String text, final String ratePct) {
         MAIN.post(() -> {
             ensureTts(ctx);
-            if (!ttsReady || tts == null) return;
+            if (!ttsReady || tts == null) {
+                DebugLog.add("TTS", "系統 TTS 未就緒，無法發聲（engine fallback 到尾都冇聲）");
+                return;
+            }
             try {
                 float rate = 1f;
                 try {
