@@ -72,10 +72,10 @@ public class AiEngine {
             tag = "emm";
         }
         if (tag.isEmpty()) return "";
-        return TAG_RND.nextInt(100) < 40 ? tag : ""; // 節制：40% 先落標籤
+        return TAG_RND.nextInt(100) < 20 ? tag : ""; // 節制：得 20% 先落標籤（稀有調味）
     }
 
-    /** 全局限流：30 秒內用過標籤就唔准再用，保證唔會連續兩句都帶聲。 */
+    /** 全局限流：60 秒內用過標籤就唔准再用，保證唔會連續兩句都帶聲。 */
     private static long lastTagAt = 0;
 
     public static String throttleTag(String tag) {
@@ -84,9 +84,56 @@ public class AiEngine {
             lastTagAt = 0;
             return "";
         }
-        if (now - lastTagAt < 30_000) return ""; // 太密，放棄
+        if (now - lastTagAt < 60_000) return ""; // 太密，放棄
         lastTagAt = now;
         return tag;
+    }
+
+    /**
+     * AI 俾嘅 tag 都要過內容關：標籤同句子內容唔夾就丟（AI 亂加都冇用）。
+     * sighs 一定要句入面有嘆氣詞；laughs 要有開心詞；gasps 要有疑問；emm 要有猶豫。
+     */
+    public static boolean contentMatch(String reply, String tag) {
+        if (reply == null || tag == null || tag.isEmpty()) return false;
+        switch (tag) {
+            case "sighs":
+                return reply.contains("唉") || reply.contains("算啦");
+            case "laughs":
+            case "chuckle":
+                return reply.contains("！") || reply.contains("!")
+                        || reply.contains("哈哈") || reply.contains("好笑");
+            case "gasps":
+                return reply.contains("吓") || reply.contains("喂")
+                        || reply.contains("？") || reply.contains("?");
+            case "emm":
+                return reply.contains("嗯") || reply.contains("等我諗下") || reply.contains("等我唞");
+            case "breath":
+                return reply.contains("唞") || reply.contains("深呼吸");
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * emotion 都要同內容夾：AI 亂揀 sad/happy 會搞到成段語氣唔夾（sad 聽落似嘆氣）。
+     * sad 一定要句中有喪氣字眼；happy 要有開心字眼；surprised 要有疑問。唔夾就降返自然。
+     */
+    public static String emotionForContent(String reply, String aiEmotion) {
+        String e = safeEmotion(aiEmotion);
+        if (e == null || e.isEmpty() || reply == null) return e;
+        switch (e) {
+            case "sad":
+                return (reply.contains("攰") || reply.contains("痛") || reply.contains("唉")
+                        || reply.contains("算啦") || reply.contains("冇力") || reply.contains("唔想")
+                        || reply.contains("灰") || reply.contains("頹") || reply.contains("麻木")) ? e : "";
+            case "happy":
+                return (reply.contains("！") || reply.contains("!")
+                        || reply.contains("開心") || reply.contains("好嘢") || reply.contains("正")) ? e : "";
+            case "surprised":
+                return (reply.contains("？") || reply.contains("?")) ? e : "";
+            default:
+                return e; // calm / fluent / 空 唔使校
+        }
     }
 
     /** 校驗 emotion 喺咪白名單內，唔喺就返回空（自然）。 */
@@ -263,7 +310,7 @@ public class AiEngine {
                         + "3. 生成 " + btnCount + " 個新按鈕文字（廣東話口語、4-10個字、具體、唔好命令式、唔好重複現有按鈕；最少 4 個，最多 " + btnCount + " 個），捕捉佢下一個狀態。\n"
                         + "4. 判斷段落語氣 emotion（成段話嘅基調）：\n"
                         + "- \"calm\"：平靜、抽離、專業（指認翻譯官、安慰、沉重嘅嘢）\n"
-                        + "- \"sad\"：傷心、柔軟（佢好攰／好痛／講喪氣嘢嗰陣）\n"
+                        + "- \"sad\"：傷心、柔軟——極少用！只有佢明言好攰／好痛／好灰嗰陣先用；普通安慰唔係 sad（聽落會似嘆氣）\n"
                         + "- \"happy\"：開朗、輕快（鼓勵、微小勝利、輕鬆嘅嘢）\n"
                         + "- \"surprised\"：驚訝（好少用，得啲「喂？咁都得？」嘅位先用）\n"
                         + "- \"fluent\"：流利自然（普通敘述）\n"
@@ -278,9 +325,12 @@ public class AiEngine {
                 JSONObject j = new JSONObject(extractJson(out));
                 String type = j.optString("type", "other");
                 String reply = j.optString("reply", "").trim();
-                String emotion = safeEmotion(j.optString("emotion", ""));
-                String tag = throttleTag(safeTag(j.optString("tag", "")));
-                if (tag.isEmpty()) tag = throttleTag(suggestTag(reply, emotion)); // AI 冇俾就 App 補（都有限流）
+                // emotion 要同內容夾（AI 亂揀 sad 會似嘆氣腔）；tag 一定要內容匹配先用
+                String emotion = emotionForContent(reply, j.optString("emotion", ""));
+                String aiTag = safeTag(j.optString("tag", ""));
+                String tag = contentMatch(reply, aiTag) ? aiTag : "";
+                if (tag.isEmpty()) tag = suggestTag(reply, emotion); // App 補（得 20%）
+                tag = throttleTag(tag);
                 List<String> buttons = null;
                 JSONArray arr = j.optJSONArray("buttons");
                 if (arr != null) {
