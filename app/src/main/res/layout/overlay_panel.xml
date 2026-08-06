@@ -161,6 +161,17 @@
         android:textSize="13sp"
         android:textColor="#2E7D5B" />
 
+    <Button
+        android:id="@+id/btnTimedNudge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/btn_bg"
+        android:minHeight="44dp"
+        android:text="⏰ 定時推動：延遲後提醒並逐步確認"
+        android:textColor="#2E7D5B"
+        android:textSize="13sp" />
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"

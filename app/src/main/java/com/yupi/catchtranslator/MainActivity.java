@@ -39,7 +39,7 @@ public class MainActivity extends Activity {
     private LinearLayout llEdge;
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
     private static final String[] EDGE_STYLE_VALUES = {"friendly", "", "cheerful", "serious"};
-    private Button btnStart;
+    private Button btnStart, btnAlarmPerm;
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
@@ -84,6 +84,7 @@ public class MainActivity extends Activity {
         tvSummary = findViewById(R.id.tvSummary);
         tvStats = findViewById(R.id.tvStats);
         btnStart = findViewById(R.id.btnStart);
+        btnAlarmPerm = findViewById(R.id.btnAlarmPerm);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
         rgBtnCount = findViewById(R.id.rgBtnCount);
@@ -161,6 +162,7 @@ public class MainActivity extends Activity {
         });
         btnStart.setOnClickListener(v -> startFloating());
         findViewById(R.id.btnPerm).setOnClickListener(v -> openOverlaySettings());
+        btnAlarmPerm.setOnClickListener(v -> openExactAlarmSettings());
 
         rgSize.setOnCheckedChangeListener((g, id) -> {
             String v = id == R.id.rbSizeSmall ? "small" : id == R.id.rbSizeMedium ? "medium" : "large";
@@ -208,6 +210,7 @@ public class MainActivity extends Activity {
         });
 
         DailySummary.schedule(this);
+        TimedNudgeScheduler.rescheduleAll(this);
 
         if (Build.VERSION.SDK_INT >= 33) {
             requestPermissions(new String[]{
@@ -222,12 +225,23 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refresh();
+        handleDueTimedNudge(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleDueTimedNudge(intent);
     }
 
     private void refresh() {
         boolean ok = Settings.canDrawOverlays(this);
         tvStatus.setText(ok ? "懸浮權限：已開啟 ✅" : "懸浮權限：未開啟 ❌（撳下面掣去開）");
         btnStart.setEnabled(ok);
+        boolean exact = TimedNudgeScheduler.canScheduleExact(this);
+        btnAlarmPerm.setText(exact ? "準時提醒權限：已開啟 ✅" : "開啟「準時提醒」權限");
+        btnAlarmPerm.setEnabled(Build.VERSION.SDK_INT >= 31 && !exact);
         tvRecords.setText(new TranslatorDb(this).dump());
         renderStats();
 
@@ -548,6 +562,38 @@ public class MainActivity extends Activity {
         Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:" + getPackageName()));
         startActivity(i);
+    }
+
+    private void openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < 31 || TimedNudgeScheduler.canScheduleExact(this)) {
+            Toast.makeText(this, "準時提醒權限已開啟", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+        }
+    }
+
+    /** 冇懸浮權限時，到點通知會帶任務返主頁；開權限後立即開始逐步推動。 */
+    private void handleDueTimedNudge(Intent intent) {
+        if (intent == null) return;
+        String task = intent.getStringExtra(TimedNudgeScheduler.EXTRA_TASK);
+        if (task == null || task.trim().isEmpty()) return;
+        if (!Settings.canDrawOverlays(this)) {
+            tvStatus.setText("⏰ 定時任務已到：「" + task.trim() + "」——先開懸浮權限開始逐步確認");
+            Toast.makeText(this, "定時任務已到，請先開懸浮權限", Toast.LENGTH_LONG).show();
+            return;
+        }
+        intent.removeExtra(TimedNudgeScheduler.EXTRA_TASK);
+        Intent service = new Intent(this, FloatingService.class)
+                .setAction(FloatingService.ACTION_START_TIMED_NUDGE)
+                .putExtra(TimedNudgeScheduler.EXTRA_TASK, task.trim());
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(service);
+        else startService(service);
     }
 
     private static int indexOf(String[] arr, String v) {

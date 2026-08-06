@@ -9,9 +9,12 @@
     android:layout_margin="8dp">
 
     <TextView
+        android:id="@+id/tvNudgeTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🚀 推動力"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp"
+        android:text="🚀 推動力 · 按住呢度移動"
         android:textSize="15sp"
         android:textStyle="bold"
         android:textColor="#2E7D5B" />

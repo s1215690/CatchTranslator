@@ -31,7 +31,9 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,6 +51,8 @@ import java.util.concurrent.Executors;
 public class FloatingService extends Service {
 
     public static final String CHANNEL_ID = "floating_channel";
+    public static final String ACTION_START_TIMED_NUDGE =
+            "com.yupi.catchtranslator.START_TIMED_NUDGE";
     private static final String[] LOCALES = {"yue-Hant-HK", "zh-HK", "zh-CN", "zh"};
 
     private static final long DOUBLE_TAP_MS = 300;
@@ -71,12 +75,13 @@ public class FloatingService extends Service {
 
     private TextView statusText;
     private EditText inputBox;
-    private Button nudgeBtn;
+    private Button nudgeBtn, btnTimedNudge;
     private Button btnGratitude;
     private LinearLayout llButtons;
 
     private NudgeManager nudge;
     private boolean pendingNudge = false;
+    private boolean pendingTimedNudge = false;
     private boolean pendingGratitude = false;
     private LinearLayout llFollowup;
     private Button btnFollow1, btnFollow2;
@@ -117,6 +122,12 @@ public class FloatingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_START_TIMED_NUDGE.equals(intent.getAction())) {
+            String task = intent.getStringExtra(TimedNudgeScheduler.EXTRA_TASK);
+            if (task != null && !task.trim().isEmpty()) {
+                ui.post(() -> startTimedNudge(task.trim()));
+            }
+        }
         return START_STICKY;
     }
 
@@ -346,6 +357,7 @@ public class FloatingService extends Service {
             }
         });
         nudgeBtn = panel.findViewById(R.id.btnNudge);
+        btnTimedNudge = panel.findViewById(R.id.btnTimedNudge);
         btnGratitude = panel.findViewById(R.id.btnGratitude);
         String hint = todayHint();
         if (hint != null) {
@@ -354,6 +366,7 @@ public class FloatingService extends Service {
             nudgeBtn.setText("🚀 推動力：想做咩？講出嚟");
         }
         nudgeBtn.setOnClickListener(v -> onNudgeTap());
+        btnTimedNudge.setOnClickListener(v -> onTimedNudgeTap());
         btnGratitude.setOnClickListener(v -> onGratitudeTap());
         llFollowup = panel.findViewById(R.id.llFollowup);
         btnFollow1 = panel.findViewById(R.id.btnFollow1);
@@ -432,6 +445,20 @@ public class FloatingService extends Service {
         if (pendingGratitude && !source.equals("button")) {
             pendingGratitude = false;
             handleGratitude(text);
+            return;
+        }
+        if (!source.equals("button")) {
+            TimedNudgeScheduler.ParseResult parsed = TimedNudgeScheduler.parse(text);
+            if (parsed != null) {
+                pendingTimedNudge = false;
+                pendingNudge = false;
+                scheduleTimedNudge(parsed.task, parsed.delayMs);
+                return;
+            }
+        }
+        if (pendingTimedNudge && !source.equals("button")) {
+            setStatus("⏰ 未聽到延遲時間——例如講「30分鐘後提醒我出去食飯」");
+            VoicePlayer.speak(this, "請連埋時間一齊講，例如三十分鐘後提醒我出去食飯。");
             return;
         }
         if (pendingNudge && !source.equals("button")) {
@@ -671,6 +698,9 @@ public class FloatingService extends Service {
     }
 
     private void onNudgeTap() {
+        pendingNudge = false;
+        pendingTimedNudge = false;
+        pendingGratitude = false;
         String t = inputBox != null ? inputBox.getText().toString().trim() : "";
         if (!t.isEmpty()) {
             inputBox.setText("");
@@ -687,8 +717,70 @@ public class FloatingService extends Service {
         }
     }
 
+    /** ⏰ 定時推動：自然語言直接排程，普通任務就彈出常用延遲選項。 */
+    private void onTimedNudgeTap() {
+        pendingTimedNudge = false;
+        pendingNudge = false;
+        pendingGratitude = false;
+        String text = inputBox != null ? inputBox.getText().toString().trim() : "";
+        if (text.isEmpty()) {
+            pendingTimedNudge = true;
+            pendingNudge = false;
+            pendingGratitude = false;
+            setStatus("⏰ 講出時間同任務，例如「30分鐘後提醒我出去食飯」");
+            VoicePlayer.speak(this, "想幾耐之後提醒？例如講，三十分鐘後提醒我出去食飯。");
+            return;
+        }
+
+        TimedNudgeScheduler.ParseResult parsed = TimedNudgeScheduler.parse(text);
+        if (parsed != null) {
+            inputBox.setText("");
+            scheduleTimedNudge(parsed.task, parsed.delayMs);
+            return;
+        }
+
+        PopupMenu menu = new PopupMenu(this, btnTimedNudge);
+        menu.getMenu().add("10 分鐘後");
+        menu.getMenu().add("30 分鐘後");
+        menu.getMenu().add("1 小時後");
+        menu.getMenu().add("2 小時後");
+        menu.setOnMenuItemClickListener(item -> {
+            long delay;
+            String label = item.getTitle().toString();
+            if (label.startsWith("10")) delay = 10 * 60_000L;
+            else if (label.startsWith("30")) delay = 30 * 60_000L;
+            else if (label.startsWith("1 ")) delay = 60 * 60_000L;
+            else delay = 2 * 60 * 60_000L;
+            inputBox.setText("");
+            scheduleTimedNudge(text, delay);
+            return true;
+        });
+        menu.show();
+    }
+
+    private void scheduleTimedNudge(String task, long delayMs) {
+        try {
+            TimedNudgeScheduler.ScheduleResult result =
+                    TimedNudgeScheduler.schedule(this, task, delayMs);
+            pendingTimedNudge = false;
+            new TranslatorDb(this).insert("定時推動", task + "｜"
+                    + TimedNudgeScheduler.describeDelay(delayMs), "timer");
+            feedbackOk();
+            String when = TimedNudgeScheduler.describeDelay(delayMs);
+            String accuracy = result.exact ? "" : "（手機未開精確鬧鐘權限，時間可能稍有延遲）";
+            setStatus("⏰ 已安排：" + when + "提醒「" + task + "」" + accuracy);
+            VoicePlayer.speak(this, "好，" + when + "提醒你「" + task + "」。到時我會一步一步陪你做。");
+            Toast.makeText(this, "已設定：" + when + "「" + task + "」", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            setStatus("⏰ 定時提醒設定失敗：" + e.getMessage());
+            Toast.makeText(this, "定時提醒失敗：" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     /** 🙏 感恩練習：AI 引導，用戶自己講出擁有／得到嘅嘢，AI 溫暖回應＋語音。 */
     private void onGratitudeTap() {
+        pendingTimedNudge = false;
+        pendingNudge = false;
         pendingGratitude = true;
         setStatus("🙏 諗緊點引導你…");
         pool.execute(() -> {
@@ -716,6 +808,12 @@ public class FloatingService extends Service {
     private void startNudge(String text) {
         if (nudge == null) nudge = new NudgeManager(this, wm, nudgeCallback);
         nudge.start(text);
+    }
+
+    private void startTimedNudge(String text) {
+        if (nudge == null) nudge = new NudgeManager(this, wm, nudgeCallback);
+        feedbackOk();
+        nudge.startTimed(text);
     }
 
     private final NudgeManager.Callback nudgeCallback = new NudgeManager.Callback() {

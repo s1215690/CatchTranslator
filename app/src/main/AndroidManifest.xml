@@ -43,6 +43,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".TimedNudgeReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".BootReceiver"
             android:exported="false">
             <intent-filter>

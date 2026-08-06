@@ -11,6 +11,7 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         DailySummary.schedule(ctx);
+        TimedNudgeScheduler.rescheduleAll(ctx);
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         if (p.getBoolean("floating_enabled", false)) {
             try {

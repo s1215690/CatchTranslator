@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -56,13 +57,15 @@ public class NudgeManager {
     private final List<String> usedPhrases = new ArrayList<>();
 
     private View popup;
-    private TextView tvPhrase;
+    private TextView tvPhrase, tvTitle;
     private Button btnDone, btnCancel;
+    private WindowManager.LayoutParams popupParams;
     private String task = "";
     private List<String> steps = new ArrayList<>();
     private int stepIdx = 0;
     private int stepAttempt = 0;
     private boolean running = false;
+    private boolean timed = false;
     private Runnable ticker;
 
     public NudgeManager(Context ctx, WindowManager wm, Callback cb) {
@@ -73,18 +76,28 @@ public class NudgeManager {
 
     /** 開始推動：先拆步，再彈窗＋讀出第一步。 */
     public void start(String raw) {
+        start(raw, false);
+    }
+
+    /** 定時提醒到點後開始：沿用同一套拆步、逐步確認流程。 */
+    public void startTimed(String raw) {
+        start(raw, true);
+    }
+
+    private void start(String raw, boolean fromTimer) {
         stop();
         running = true;
+        timed = fromTimer;
         stepIdx = 0;
         stepAttempt = 0;
         usedPhrases.clear();
-        callback.onStatus("分析緊你想做咩…");
+        callback.onStatus(fromTimer ? "⏰ 時間到，準備定時推動…" : "分析緊你想做咩…");
         pool.execute(() -> {
             final List<String> s = analyzeSteps(raw);
             ui.post(() -> {
                 if (!running) return;
                 steps = s;
-                task = s.isEmpty() ? raw.trim() : s.get(0);
+                task = raw.trim();
                 showPopup();
                 nextNudge();
             });
@@ -140,26 +153,96 @@ public class NudgeManager {
     private void showPopup() {
         if (popup != null) return;
         popup = LayoutInflater.from(ctx).inflate(R.layout.nudge_popup, null);
+        tvTitle = popup.findViewById(R.id.tvNudgeTitle);
         tvPhrase = popup.findViewById(R.id.tvNudgePhrase);
         btnDone = popup.findViewById(R.id.btnNudgeDone);
         btnCancel = popup.findViewById(R.id.btnNudgeCancel);
+        tvTitle.setText(timed ? "⏰ 定時推動 · 按住呢度移動" : "🚀 推動力 · 按住呢度移動");
         btnDone.setText("✅ 做咗呢步");
         btnDone.setOnClickListener(v -> onStepDone());
         btnCancel.setOnClickListener(v -> end(false));
-        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+        popupParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.y = dp(160);
-        wm.addView(popup, lp);
+        popupParams.gravity = Gravity.TOP | Gravity.START;
+        SharedPreferences position = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        int defaultX = Math.max(dp(8),
+                (ctx.getResources().getDisplayMetrics().widthPixels - dp(330)) / 2);
+        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+        int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+        popupParams.x = Math.max(0, Math.min(Math.max(0, screenW - dp(80)),
+                position.getInt("nudge_popup_x", defaultX)));
+        popupParams.y = Math.max(0, Math.min(Math.max(0, screenH - dp(80)),
+                position.getInt("nudge_popup_y", dp(160))));
+        attachDragHandle(tvTitle);
+        wm.addView(popup, popupParams);
+        popup.post(this::clampPopupToScreen);
+    }
+
+    private void clampPopupToScreen() {
+        if (popup == null || popupParams == null) return;
+        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+        int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+        int maxX = Math.max(0, screenW - popup.getWidth());
+        int maxY = Math.max(0, screenH - popup.getHeight());
+        popupParams.x = Math.max(0, Math.min(maxX, popupParams.x));
+        popupParams.y = Math.max(0, Math.min(maxY, popupParams.y));
+        try { wm.updateViewLayout(popup, popupParams); } catch (Exception ignored) {}
+    }
+
+    /** 只拖標題列，避免撳確認／取消時誤移動。 */
+    private void attachDragHandle(View handle) {
+        handle.setOnTouchListener(new View.OnTouchListener() {
+            private float downRawX, downRawY;
+            private int startX, startY;
+            private boolean moved;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                if (popupParams == null || popup == null) return false;
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawX = event.getRawX();
+                        downRawY = event.getRawY();
+                        startX = popupParams.x;
+                        startY = popupParams.y;
+                        moved = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        int dx = Math.round(event.getRawX() - downRawX);
+                        int dy = Math.round(event.getRawY() - downRawY);
+                        if (Math.abs(dx) > dp(3) || Math.abs(dy) > dp(3)) moved = true;
+                        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+                        int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+                        int maxX = Math.max(0, screenW - Math.max(popup.getWidth(), dp(80)));
+                        int maxY = Math.max(0, screenH - Math.max(popup.getHeight(), dp(80)));
+                        popupParams.x = Math.max(0, Math.min(maxX, startX + dx));
+                        popupParams.y = Math.max(0, Math.min(maxY, startY + dy));
+                        try { wm.updateViewLayout(popup, popupParams); } catch (Exception ignored) {}
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                                .putInt("nudge_popup_x", popupParams.x)
+                                .putInt("nudge_popup_y", popupParams.y)
+                                .apply();
+                        if (!moved) v.performClick();
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
     }
 
     private void hidePopup() {
         if (popup != null) {
             try { wm.removeView(popup); } catch (Exception ignored) {}
             popup = null;
+            popupParams = null;
+            tvTitle = null;
             tvPhrase = null;
             btnDone = null;
             btnCancel = null;
@@ -234,7 +317,9 @@ public class NudgeManager {
         String key = p.getString("api_key", "");
         if (!key.isEmpty()) {
             try {
-                String sys = "你係「推動力助手」。用戶而家喺度做緊：「" + cur + "」（成個任務係「" + task + "」）。"
+                String sys = "你係「推動力助手」。"
+                        + (timed ? "呢個係用戶預先設定、而家時間到嘅定時提醒。" : "")
+                        + "用戶而家喺度做緊：「" + cur + "」（成個任務係「" + task + "」）。"
                         + "生成一句廣東話催促語：15個字以內、溫暖、有變化、具體、可以幽默；"
                         + "唔好重複以下已用過嘅句子：" + (usedPhrases.isEmpty() ? "（未有）" : String.join("；", usedPhrases))
                         + "；唔好嚴厲、唔好鬧、唔好加引號、唔好用「你應該」。只輸出嗰一句。";
