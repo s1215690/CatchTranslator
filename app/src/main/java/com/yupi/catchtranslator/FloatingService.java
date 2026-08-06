@@ -355,11 +355,11 @@ public class FloatingService extends Service {
         }
         nudgeBtn.setOnClickListener(v -> onNudgeTap());
         btnGratitude.setOnClickListener(v -> onGratitudeTap());
-        if (btnMoreComfort != null) btnMoreComfort.setOnClickListener(v -> continueComfort());
         llFollowup = panel.findViewById(R.id.llFollowup);
         btnFollow1 = panel.findViewById(R.id.btnFollow1);
         btnFollow2 = panel.findViewById(R.id.btnFollow2);
         btnMoreComfort = panel.findViewById(R.id.btnMoreComfort);
+        if (btnMoreComfort != null) btnMoreComfort.setOnClickListener(v -> continueComfort());
         hideFollowup();
         String base = counterLine() + (todayHint() != null
                 ? "今日建議：「" + todayHint() + "」——撳🚀開始"
@@ -525,7 +525,8 @@ public class FloatingService extends Service {
 
     private void showFollowup(final String type, final String buttonText) {
         if (llFollowup == null) return;
-        if (btnMoreComfort != null) btnMoreComfort.setVisibility(View.VISIBLE);        if ("critic".equals(type)) {
+        if (btnMoreComfort != null) btnMoreComfort.setVisibility(View.VISIBLE);
+        if ("critic".equals(type)) {
             btnFollow1.setText("🔨 駁返佢");
             btnFollow2.setText("📋 記低就算");
             btnFollow1.setOnClickListener(v -> counterArgument(buttonText));
@@ -573,10 +574,14 @@ public class FloatingService extends Service {
             if (hist.size() > 3) hist = new java.util.ArrayList<>(hist.subList(hist.size() - 3, hist.size()));
             final AiEngine.Response r = AiEngine.respondMore(this, lastTopic, hist);
             ui.post(() -> {
-                VoicePlayer.speak(this, r.reply, r.emotion, r.tag);
                 lastReplies.add(r.reply);
                 if (lastReplies.size() > 6) lastReplies.remove(0);
                 setStatus(counterLine() + "💛「" + lastTopic + "」｜" + r.reply);
+                try {
+                    VoicePlayer.speak(this, r.reply, r.emotion, r.tag);
+                } catch (Exception e) {
+                    DebugLog.add("TTS", "再安慰 speak 異常: " + e.getMessage());
+                }
             });
         });
     }
