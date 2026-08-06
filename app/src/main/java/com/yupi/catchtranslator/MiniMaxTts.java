@@ -42,17 +42,23 @@ public class MiniMaxTts {
             "2.8 HD（推薦·最自然）", "2.8 Turbo（快·慳）"
     };
 
-    /** 語氣（voice_setting.emotion），空＝自然。實測：speech-2.8 唔支持 whisper（報 2013）。 */
-    public static final String[] EMOTION_IDS = {"", "calm", "happy"};
-    public static final String[] EMOTION_LABELS = {"自然（預設）", "平靜", "開心"};
+    /** 語氣（voice_setting.emotion），空＝唔傳（自然）。實測：speech-2.8 支持 calm/happy/sad/surprised/fluent；whisper 唔支持（報 2013）。 */
+    public static final String[] EMOTION_IDS = {"", "calm", "happy", "sad", "surprised", "fluent"};
+    public static final String[] EMOTION_LABELS = {"自然（預設）", "平靜", "開心", "傷心·安慰", "驚訝", "流利自然"};
+
+    /** 句內語氣標籤白名單（speech-2.8 專用，插喺 text 入面做即時語氣切換）。 */
+    public static final String[] TAG_IDS = {"", "laughs", "chuckle", "sighs", "gasps", "breath", "emm"};
+    public static final String[] TAG_LABELS = {"冇", "笑(laughs)", "輕笑(chuckle)", "嘆氣(sighs)", "倒吸氣(gasps)", "換氣(breath)", "猶豫(emm)"};
 
     public static void synthesize(String apiKey, String text, String voiceId, String modelId,
-                                  String ratePct, String emotion, File out) throws Exception {
+                                  String ratePct, String emotion, String tag, File out) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) throw new Exception("冇 MiniMax API Key");
+
+        String finalText = applyTag(text, tag);
 
         JSONObject body = new JSONObject();
         body.put("model", (modelId == null || modelId.isEmpty()) ? MODEL_IDS[0] : modelId);
-        body.put("text", text);
+        body.put("text", finalText);
         body.put("stream", false);
         body.put("language_boost", "Chinese,Yue"); // 強制粵語，唔填會變普通話腔！
 
@@ -101,6 +107,30 @@ public class MiniMaxTts {
         try (FileOutputStream fos = new FileOutputStream(out)) {
             fos.write(audio);
         }
+    }
+
+    /**
+     * 將語氣標籤插入句入面（speech-2.8 專用，第二層語氣控制）。
+     * 規則：插喺第一個「！／？」後；冇標點就插句尾。白名單外嘅標籤忽略。
+     */
+    public static String applyTag(String text, String tag) {
+        if (text == null || text.isEmpty()) return text;
+        String t = (tag == null ? "" : tag.trim());
+        boolean valid = false;
+        for (String id : TAG_IDS) {
+            if (id.equals(t)) { valid = true; break; }
+        }
+        if (!valid || t.isEmpty()) return text;
+        String label = "(" + t + ")";
+        if (text.contains(label)) return text; // 已經有就唔重複
+        int idx = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '！' || c == '?' || c == '？' || c == '!') { idx = i + 1; break; }
+        }
+        if (idx < 0) return text + label;
+        // 插喺標點之後（連埋後面嘅字一齊）
+        return text.substring(0, idx) + label + text.substring(idx);
     }
 
     private static String readAll(InputStream is) throws Exception {

@@ -46,8 +46,15 @@ public class VoicePlayer {
         speak(ctx, text, null);
     }
 
-    /** emotionOverride：AI 根據回應內容揀嘅語氣（""=自然 / calm / happy），空＝用設定值。 */
     public static void speak(final Context ctx, final String text, final String emotionOverride) {
+        speak(ctx, text, emotionOverride, null);
+    }
+
+    /**
+     * emotionOverride：AI 根據回應內容揀嘅語氣（""=自然 / calm / happy / sad / surprised / fluent），空＝用設定值。
+     * tag：句內語氣標籤（laughs/sighs/gasps/emm…，speech-2.8 專用）。Edge／系統 TTS 唔支持，會自動忽略。
+     */
+    public static void speak(final Context ctx, final String text, final String emotionOverride, final String tag) {
         if (text == null || text.isEmpty()) return;
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String engine = p.getString("voice_engine", "system");
@@ -77,13 +84,14 @@ public class VoicePlayer {
             final String mmEmotion = (emotionOverride != null && !emotionOverride.isEmpty())
                     ? emotionOverride : p.getString("minimax_emotion", "");
             POOL.execute(() -> {
-                File out = cachedFile(ctx, text, mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
+                String finalText = MiniMaxTts.applyTag(text, tag); // 標籤先入 text，再入 cache key
+                File out = cachedFile(ctx, finalText, mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
                 try {
                     if (!out.exists()) {
-                        MiniMaxTts.synthesize(mmKey, text, mmVoice, mmModel, ratePct, mmEmotion, out);
+                        MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
                     }
                     final File f = out;
-                    MAIN.post(() -> playFile(ctx, f, text, ratePct));
+                    MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
                 } catch (Exception e) {
                     notifyFallback(engine, e.getMessage());
                     playSystem(ctx, text, ratePct);

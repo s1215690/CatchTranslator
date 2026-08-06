@@ -27,16 +27,70 @@ public class AiEngine {
         public final String type;          // critic / guardian / stuck / feeling / worth / other
         public final String reply;         // 30-60 字回應
         public final List<String> buttons; // 4 個新按鈕；null = 唔換按鈕
-        public final String emotion;       // TTS 語氣：""=自然 / "calm"=平靜 / "happy"=開心
+        public final String emotion;       // 段落語氣：""=自然 / calm / happy / sad / surprised / fluent
+        public final String tag;           // 句內語氣標籤："" / laughs / sighs / gasps / emm…(speech-2.8 專用)
         public Response(String type, String reply, List<String> buttons) {
-            this(type, reply, buttons, "");
+            this(type, reply, buttons, "", "");
         }
         public Response(String type, String reply, List<String> buttons, String emotion) {
+            this(type, reply, buttons, emotion, "");
+        }
+        public Response(String type, String reply, List<String> buttons, String emotion, String tag) {
             this.type = type;
             this.reply = reply;
             this.buttons = buttons;
             this.emotion = emotion;
+            this.tag = tag;
         }
+    }
+
+    /** 段落語氣白名單（MiniMax 實測支持；whisper 報 2013 所以唔用）。 */
+    public static final String[] EMOTIONS = {"", "calm", "happy", "sad", "surprised", "fluent"};
+
+    /** 句內語氣標籤白名單（speech-2.8 專用；其他引擎會忽略）。 */
+    public static final String[] TAGS = {"", "laughs", "chuckle", "sighs", "gasps", "breath", "emm"};
+
+    /**
+     * 根據回應內容＋語氣，App 端自動補一個語氣標籤（AI 冇俾／俾錯嗰陣兜底）。
+     * 規則：開心感嘆 → 笑；嘆氣位 → sighs；驚訝位 → gasps；猶豫位 → emm。
+     */
+    public static String suggestTag(String reply, String emotion) {
+        if (reply == null || reply.isEmpty()) return "";
+        if ("surprised".equals(emotion)) return "gasps";
+        if (reply.contains("吓?") || reply.contains("喂?") || reply.contains("真㗎?")
+                || reply.contains("吓？") || reply.contains("喂？") || reply.contains("真㗎？")) {
+            return "gasps";
+        }
+        if ("sad".equals(emotion)) return "sighs";
+        if (reply.contains("唉") || reply.contains("算啦") || reply.contains("唔緊要")
+                || reply.contains("唔好意思")) {
+            return "sighs";
+        }
+        if ("happy".equals(emotion) && (reply.contains("！") || reply.contains("!"))) {
+            return "laughs";
+        }
+        if (reply.contains("嗯") || reply.contains("等我諗下") || reply.contains("等我唞")) {
+            return "emm";
+        }
+        return "";
+    }
+
+    /** 校驗 emotion 喺咪白名單內，唔喺就返回空（自然）。 */
+    public static String safeEmotion(String e) {
+        if (e == null) return "";
+        for (String id : EMOTIONS) {
+            if (id.equals(e.trim())) return id;
+        }
+        return "";
+    }
+
+    /** 校驗 tag 喺咪白名單內，唔喺就返回空。 */
+    public static String safeTag(String t) {
+        if (t == null) return "";
+        for (String id : TAGS) {
+            if (id.equals(t.trim())) return id;
+        }
+        return "";
     }
 
     // ---------- 本地 fallback 模板池（有分類、隨機變化） ----------
@@ -142,9 +196,11 @@ public class AiEngine {
         }
         String reply = pool[Math.abs(new Random().nextInt()) % pool.length];
         if (narration) reply = toNarration(reply);
-        // 語氣：安慰／抽離／沉重用 calm，普通共情用自然
-        String emo = ("feeling".equals(type) || "other".equals(type)) ? "" : "calm";
-        return new Response(type, reply, fallbackButtons(count), emo);
+        // 語氣按類型：批判／看守／唔重要 → 平靜；僵住 → 傷心；共情 → 自然
+        String emo = "stuck".equals(type) || "worth".equals(type) ? "sad"
+                : "critic".equals(type) || "guardian".equals(type) ? "calm" : "";
+        String tag = suggestTag(reply, emo);
+        return new Response(type, reply, fallbackButtons(count), emo, tag);
     }
 
     /** 旁白模式：將「你」改做「佢」，拉開觀察距離。 */
@@ -191,16 +247,26 @@ public class AiEngine {
                         + "1. 判斷類型：critic=翻譯官批判聲（「佢又話我唔配」「我覺得自己好懶」）；guardian=溫柔看守／安全陷阱（「坐喺度就安全」「唔好郁就冇事」）；stuck=冇動力／僵住（「我動唔到」「唔想覆信息」）；feeling=真實感受／身體狀態（「心口好實」）；worth=覺得自己唔重要／值唔值得（「我對佢哋嚟講唔重要」）；other=其他。\n"
                         + "2. 用廣東話寫30-80字嘅回應，跟足上面原則。\n"
                         + "3. 生成 " + btnCount + " 個新按鈕文字（廣東話口語、4-10個字、具體、唔好命令式、唔好重複現有按鈕；最少 4 個，最多 " + btnCount + " 個），捕捉佢下一個狀態。\n"
-                        + "4. 判斷語氣 emotion：根據回應嘅情感色彩揀——安慰／抽離／沉重用「calm」，鼓勵／慶祝／輕鬆用「happy」，普通共情用「」（空，自然）。只可以係 \"\"、\"calm\"、\"happy\" 三揀一。\n"
-                        + "只輸出JSON：{\"type\":\"critic\",\"emotion\":\"calm\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\",\"...\",\"...\"]}";
+                        + "4. 判斷段落語氣 emotion（成段話嘅基調）：\n"
+                        + "- \"calm\"：平靜、抽離、專業（指認翻譯官、安慰、沉重嘅嘢）\n"
+                        + "- \"sad\"：傷心、柔軟（佢好攰／好痛／講喪氣嘢嗰陣）\n"
+                        + "- \"happy\"：開朗、輕快（鼓勵、微小勝利、輕鬆嘅嘢）\n"
+                        + "- \"surprised\"：驚訝（好少用，得啲「喂？咁都得？」嘅位先用）\n"
+                        + "- \"fluent\"：流利自然（普通敘述）\n"
+                        + "- \"\"：中性自然（唔知用邊個就留空）\n"
+                        + "5. 判斷句內語氣標籤 tag（第二層，句中即時語氣）：喺「表情」位用一個——\n"
+                        + "- laughs（好笑／開心笑）、chuckle（輕笑）、sighs（嘆氣：唉…）、gasps（倒吸氣：吓？）、breath（換氣）、emm（猶豫：嗯…）\n"
+                        + "- 冇表情位就留空；唔好夾硬加；只可以揀一個，一定要係上面其中一個或者空字串。\n"
+                        + "只輸出JSON：{\"type\":\"critic\",\"emotion\":\"calm\",\"tag\":\"sighs\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\"]}（buttons 最少 4 個，最多 " + btnCount + " 個）";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
                         key, p.getString("model", "deepseek-chat"), sys, "生成回應。", 1200, thinking(ctx));
                 JSONObject j = new JSONObject(extractJson(out));
                 String type = j.optString("type", "other");
                 String reply = j.optString("reply", "").trim();
-                String emotion = j.optString("emotion", "");
-                if (!"calm".equals(emotion) && !"happy".equals(emotion)) emotion = "";
+                String emotion = safeEmotion(j.optString("emotion", ""));
+                String tag = safeTag(j.optString("tag", ""));
+                if (tag.isEmpty()) tag = suggestTag(reply, emotion); // AI 冇俾就 App 補
                 List<String> buttons = null;
                 JSONArray arr = j.optJSONArray("buttons");
                 if (arr != null) {
@@ -213,9 +279,10 @@ public class AiEngine {
                     if (buttons.size() < 4) buttons = null;
                 }
                 if (!reply.isEmpty() && reply.length() <= 150) {
-                    DebugLog.add("AI", "解析 OK: type=" + type + " | emotion=" + emotion + " | reply=" + truncate(reply, 80)
+                    DebugLog.add("AI", "解析 OK: type=" + type + " | emotion=" + emotion + " | tag=" + tag
+                            + " | reply=" + truncate(reply, 80)
                             + " | buttons=" + (buttons == null ? "null(保持原按鈕)" : buttons.size()));
-                    return new Response(type, reply, buttons, emotion);
+                    return new Response(type, reply, buttons, emotion, tag);
                 }
                 DebugLog.add("AI", "解析失敗: reply=" + truncate(reply, 60) + "（超長或空）→ fallback");
             } catch (Exception e) {
