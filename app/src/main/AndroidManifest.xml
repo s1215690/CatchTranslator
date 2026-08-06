@@ -46,6 +46,15 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <service
+            android:name=".ActiveComfortService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="proactive_comfort_voice_assistant" />
+        </service>
+
         <receiver
             android:name=".DailySummaryReceiver"
             android:exported="false" />

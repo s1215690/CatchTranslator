@@ -27,14 +27,24 @@
             android:textColor="#7FA88F" />
 
         <!-- AI 設定 -->
-        <TextView
-            android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/btnAiConfigToggle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="AI 設定"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="#2E7D5B" />
+            android:background="@drawable/btn_bg"
+            android:gravity="start|center_vertical"
+            android:text="⚙ AI 設定（點擊展開）"
+            android:textAllCaps="false"
+            android:textColor="#2E7D5B"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/llAiConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <EditText
             android:id="@+id/etApiKey"
@@ -99,15 +109,27 @@
                 android:text="測試連線" />
         </LinearLayout>
 
+        </LinearLayout>
+
         <!-- 調試（發 AI Log 去 Telegram） -->
-        <TextView
-            android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/btnDebugConfigToggle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="調試（AI Log 發送去 Telegram）"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="#2E7D5B" />
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_bg"
+            android:gravity="start|center_vertical"
+            android:text="🛠 Telegram 調試設定（點擊展開）"
+            android:textAllCaps="false"
+            android:textColor="#2E7D5B"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/llDebugConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <EditText
             android:id="@+id/etDebugToken"
@@ -126,6 +148,8 @@
             android:hint="TG Chat ID（可選，例如 123456789）"
             android:inputType="number"
             android:maxLines="1" />
+
+        </LinearLayout>
 
         <!-- 懸浮按鈕 -->
         <TextView
@@ -263,6 +287,47 @@
             android:textSize="13sp"
             android:textColor="#E67E22" />
 
+        <!-- 主動安慰 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="主動安慰"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2E7D5B" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="按指定間隔生成一句溫柔安慰，再用目前語音引擎播出；偵測到其他音樂或語音時會暫停。"
+            android:textSize="13sp"
+            android:textColor="#7FA88F" />
+
+        <Switch
+            android:id="@+id/swActiveComfort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:checked="false"
+            android:text="開啟主動安慰（背景運行）"
+            android:textSize="14sp" />
+
+        <Spinner
+            android:id="@+id/spActiveComfortInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/tvActiveComfortStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="13sp"
+            android:textColor="#E67E22" />
+
         <!-- 面板大小 -->
         <TextView
             android:layout_width="wrap_content"
@@ -302,14 +367,24 @@
         </RadioGroup>
 
         <!-- 語音引擎 -->
-        <TextView
-            android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/btnVoiceConfigToggle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="語音引擎"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="#2E7D5B" />
+            android:background="@drawable/btn_bg"
+            android:gravity="start|center_vertical"
+            android:text="🔊 語音設定（點擊展開）"
+            android:textAllCaps="false"
+            android:textColor="#2E7D5B"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/llVoiceConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <RadioGroup
             android:id="@+id/rgVoice"
@@ -492,6 +567,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="試聽語音／情感" />
+
+        </LinearLayout>
 
         <!-- 語速 -->
         <TextView

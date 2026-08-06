@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -36,6 +37,8 @@ public class MainActivity extends Activity {
     private TextView tvStatus, tvRecords, tvSummary, tvStats, tvLog;
     private Button btnLogToggle, btnSendLog;
     private boolean logVisible = false;
+    private Button btnAiConfigToggle, btnDebugConfigToggle, btnVoiceConfigToggle;
+    private LinearLayout llAiConfig, llDebugConfig, llVoiceConfig;
     private Spinner spEdgeVoice, spEdgeStyle;
     private LinearLayout llEdge;
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
@@ -43,8 +46,13 @@ public class MainActivity extends Activity {
     private Button btnStart, btnAlarmPerm;
     private Switch swBluetoothKeepAlive;
     private TextView tvBluetoothKeepAliveStatus;
+    private Switch swActiveComfort;
+    private Spinner spActiveComfortInterval;
+    private TextView tvActiveComfortStatus;
+    private boolean refreshingActiveComfort;
     private int pendingBluetoothAction = 0;
     private static final int BLUETOOTH_ACTION_ENABLE = 1;
+    private static final int[] ACTIVE_COMFORT_INTERVAL_MINUTES = {15, 20, 25, 30};
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
@@ -84,6 +92,12 @@ public class MainActivity extends Activity {
         etBase = findViewById(R.id.etBaseUrl);
         etDebugToken = findViewById(R.id.etDebugToken);
         etDebugChatId = findViewById(R.id.etDebugChatId);
+        btnAiConfigToggle = findViewById(R.id.btnAiConfigToggle);
+        btnDebugConfigToggle = findViewById(R.id.btnDebugConfigToggle);
+        btnVoiceConfigToggle = findViewById(R.id.btnVoiceConfigToggle);
+        llAiConfig = findViewById(R.id.llAiConfig);
+        llDebugConfig = findViewById(R.id.llDebugConfig);
+        llVoiceConfig = findViewById(R.id.llVoiceConfig);
         tvStatus = findViewById(R.id.tvOverlayStatus);
         tvRecords = findViewById(R.id.tvRecords);
         tvSummary = findViewById(R.id.tvSummary);
@@ -92,6 +106,9 @@ public class MainActivity extends Activity {
         btnAlarmPerm = findViewById(R.id.btnAlarmPerm);
         swBluetoothKeepAlive = findViewById(R.id.swBluetoothKeepAlive);
         tvBluetoothKeepAliveStatus = findViewById(R.id.tvBluetoothKeepAliveStatus);
+        swActiveComfort = findViewById(R.id.swActiveComfort);
+        spActiveComfortInterval = findViewById(R.id.spActiveComfortInterval);
+        tvActiveComfortStatus = findViewById(R.id.tvActiveComfortStatus);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
         rgBtnCount = findViewById(R.id.rgBtnCount);
@@ -132,14 +149,46 @@ public class MainActivity extends Activity {
         esAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spEdgeStyle.setAdapter(esAdapter);
 
+        ArrayAdapter<String> activeComfortAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item,
+                new String[]{"每 15 分鐘", "每 20 分鐘", "每 25 分鐘", "每 30 分鐘"});
+        activeComfortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spActiveComfortInterval.setAdapter(activeComfortAdapter);
+
         SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
         etKey.setText(p.getString("api_key", ""));
         etModel.setText(p.getString("model", "deepseek-chat"));
         etBase.setText(p.getString("base_url", "https://api.deepseek.com"));
         etDebugToken.setText(p.getString("debug_token", ""));
         etDebugChatId.setText(p.getString("debug_chat_id", ""));
+        spActiveComfortInterval.setSelection(indexOf(ACTIVE_COMFORT_INTERVAL_MINUTES,
+                ActiveComfortService.getIntervalMinutes(this)));
 
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
+        btnAiConfigToggle.setOnClickListener(v ->
+                toggleSection(llAiConfig, btnAiConfigToggle, "⚙ AI 設定"));
+        btnDebugConfigToggle.setOnClickListener(v ->
+                toggleSection(llDebugConfig, btnDebugConfigToggle, "🛠 Telegram 調試設定"));
+        btnVoiceConfigToggle.setOnClickListener(v ->
+                toggleSection(llVoiceConfig, btnVoiceConfigToggle, "🔊 語音設定"));
+        swActiveComfort.setOnCheckedChangeListener((button, checked) -> {
+            if (!refreshingActiveComfort) setActiveComfort(checked);
+        });
+        spActiveComfortInterval.setOnItemSelectedListener(
+                new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parent, View view,
+                                               int position, long id) {
+                        if (!refreshingActiveComfort && position >= 0
+                                && position < ACTIVE_COMFORT_INTERVAL_MINUTES.length) {
+                            setActiveComfortInterval(ACTIVE_COMFORT_INTERVAL_MINUTES[position]);
+                        }
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                });
         btnLogToggle = findViewById(R.id.btnLogToggle);
         btnSendLog = findViewById(R.id.btnSendLog);
         tvLog = findViewById(R.id.tvLog);
@@ -256,6 +305,9 @@ public class MainActivity extends Activity {
             if (BluetoothKeepAliveService.isEnabled(this) && hasBluetoothPermission()) {
                 startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_START);
             }
+            if (ActiveComfortService.isEnabled(this)) {
+                startActiveComfortService(ActiveComfortService.ACTION_START);
+            }
             refresh();
             return;
         }
@@ -278,6 +330,7 @@ public class MainActivity extends Activity {
         btnAlarmPerm.setText(exact ? "準時提醒權限：已開啟 ✅" : "開啟「準時提醒」權限");
         btnAlarmPerm.setEnabled(Build.VERSION.SDK_INT >= 31 && !exact);
         refreshBluetoothKeepAlive();
+        refreshActiveComfort();
         tvRecords.setText(new TranslatorDb(this).dump());
         renderStats();
 
@@ -635,6 +688,65 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void refreshActiveComfort() {
+        SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
+        boolean enabled = p.getBoolean(ActiveComfortService.PREF_ENABLED, false);
+        int minutes = ActiveComfortService.getIntervalMinutes(this);
+        refreshingActiveComfort = true;
+        if (swActiveComfort.isChecked() != enabled) swActiveComfort.setChecked(enabled);
+        int index = indexOf(ACTIVE_COMFORT_INTERVAL_MINUTES, minutes);
+        if (spActiveComfortInterval.getSelectedItemPosition() != index) {
+            spActiveComfortInterval.setSelection(index);
+        }
+        refreshingActiveComfort = false;
+        if (enabled && !ActiveComfortService.isRunning()) {
+            startActiveComfortService(ActiveComfortService.ACTION_START);
+        }
+        tvActiveComfortStatus.setText(enabled
+                ? "主動安慰已開啟 · 每 " + minutes + " 分鐘生成並播出（其他播放時會暫停）"
+                : "目前未啟用");
+    }
+
+    private void setActiveComfort(boolean enabled) {
+        SharedPreferences.Editor editor = getSharedPreferences("settings", MODE_PRIVATE).edit();
+        editor.putBoolean(ActiveComfortService.PREF_ENABLED, enabled).apply();
+        if (enabled) {
+            startActiveComfortService(ActiveComfortService.ACTION_START);
+            Toast.makeText(this, "主動安慰已開啟 · 會按設定間隔播出", Toast.LENGTH_SHORT).show();
+        } else {
+            stopService(new Intent(this, ActiveComfortService.class));
+            Toast.makeText(this, "主動安慰已關閉", Toast.LENGTH_SHORT).show();
+        }
+        refreshActiveComfort();
+    }
+
+    private void setActiveComfortInterval(int minutes) {
+        getSharedPreferences("settings", MODE_PRIVATE).edit()
+                .putInt(ActiveComfortService.PREF_INTERVAL, minutes).apply();
+        if (getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean(ActiveComfortService.PREF_ENABLED, false)) {
+            startActiveComfortService(ActiveComfortService.ACTION_START);
+        }
+        tvActiveComfortStatus.setText("主動安慰已設定為每 " + minutes + " 分鐘");
+    }
+
+    private void startActiveComfortService(String action) {
+        Intent intent = new Intent(this, ActiveComfortService.class).setAction(action);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent);
+            else startService(intent);
+        } catch (Exception e) {
+            DebugLog.add("Comfort", "啟動主動安慰失敗: " + e.getClass().getSimpleName());
+            Toast.makeText(this, "主動安慰啟動失敗：請允許通知權限", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void toggleSection(LinearLayout content, Button header, String label) {
+        boolean open = content.getVisibility() != View.VISIBLE;
+        content.setVisibility(open ? View.VISIBLE : View.GONE);
+        header.setText(label + (open ? "（點擊收起）" : "（點擊展開）"));
+    }
+
     private void setBluetoothKeepAlive(boolean enabled) {
         if (!enabled) {
             getSharedPreferences("settings", MODE_PRIVATE).edit()
@@ -698,6 +810,13 @@ public class MainActivity extends Activity {
     private static int indexOf(String[] arr, String v) {
         for (int i = 0; i < arr.length; i++) {
             if (arr[i].equals(v)) return i;
+        }
+        return 0;
+    }
+
+    private static int indexOf(int[] arr, int value) {
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i] == value) return i;
         }
         return 0;
     }

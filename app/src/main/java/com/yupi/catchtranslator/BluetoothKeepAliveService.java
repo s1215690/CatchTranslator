@@ -50,6 +50,7 @@ public class BluetoothKeepAliveService extends Service {
     private AudioDeviceInfo currentDevice;
     private Thread audioThread;
     private volatile boolean audioLoopRunning;
+    private static volatile boolean keepAliveAudioActive;
     private String lastStatus = "";
 
     private final Runnable monitor = new Runnable() {
@@ -136,7 +137,7 @@ public class BluetoothKeepAliveService extends Service {
                 != PackageManager.PERMISSION_GRANTED) {
             return "需要「附近的設備」權限";
         }
-        AudioManager manager = (AudioManager) context.getSystemService(AUDIO_SERVICE);
+        AudioManager manager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         AudioDeviceInfo device = findBluetoothOutput(manager);
         return device == null ? "未找到已連接的藍牙音箱" : deviceName(device);
     }
@@ -195,12 +196,18 @@ public class BluetoothKeepAliveService extends Service {
      * 因此不搶 Audio Focus，只在偵測到外部播放時停下，音樂停止後由 monitor 自動恢復。
      */
     private boolean hasExternalPlayback() {
-        if (audioManager == null) return false;
+        return isExternalPlaybackActive(this);
+    }
+
+    /** 判斷目前是否有除本服務保活訊號以外的播放，供主動安慰讓路。 */
+    public static boolean isExternalPlaybackActive(Context context) {
+        AudioManager manager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (manager == null) return false;
         try {
             List<AudioPlaybackConfiguration> configs =
-                    audioManager.getActivePlaybackConfigurations();
+                    manager.getActivePlaybackConfigurations();
             if (configs == null || configs.isEmpty()) return false;
-            return audioTrack == null ? true : configs.size() > 1;
+            return keepAliveAudioActive ? configs.size() > 1 : true;
         } catch (SecurityException ignored) {
             return false;
         }
@@ -236,6 +243,7 @@ public class BluetoothKeepAliveService extends Service {
             candidate.setPreferredDevice(device);
             candidate.setVolume(TRACK_VOLUME);
             candidate.play();
+            keepAliveAudioActive = true;
             audioTrack = candidate;
             currentDevice = device;
             audioLoopRunning = true;
@@ -282,6 +290,7 @@ public class BluetoothKeepAliveService extends Service {
 
     private synchronized void stopAudio() {
         audioLoopRunning = false;
+        keepAliveAudioActive = false;
         AudioTrack local = audioTrack;
         audioTrack = null;
         currentDevice = null;

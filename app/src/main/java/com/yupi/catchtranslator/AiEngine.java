@@ -428,6 +428,16 @@ public class AiEngine {
     };
     private static int moreIdx = -1;
 
+    private static final String[] PROACTIVE_COMFORT = {
+            "唔使急住變得更好，你而家已經值得被溫柔對待，我會安靜陪你一陣。",
+            "呢一刻可能唔完美，但你仍然喺度照顧緊自己，呢件事本身已經好珍貴。",
+            "如果今日好攰，就容許自己慢一點；你唔需要證明任何嘢先配得到休息。",
+            "你可以暫時放低外面啲聲，留返一點空間畀自己，慢慢呼吸就已經足夠。",
+            "就算你而家未感覺到力量，佢都冇消失，只係先陪你安靜休息喺身邊。",
+            "我唔會催你振作；你行到邊一步，就算邊一步，呢度一直有一盞燈留住。",
+    };
+    private static int proactiveIdx = -1;
+
     /** 同一主題繼續安慰：傳埋之前講過嘅嘢，AI 會換角度、唔重複。 */
     public static Response respondMore(Context ctx, String topic, List<String> history) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
@@ -480,6 +490,61 @@ public class AiEngine {
         String reply = MORE_COMFORT[idx];
         String tag = throttleTag(suggestTag(reply, ""));
         return new Response("other", reply, null, "calm", tag);
+    }
+
+    /** 背景主動安慰：唔等用戶撳掣，按間隔生成一句並交畀語音引擎播放。 */
+    public static Response proactiveComfort(Context ctx) {
+        SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        String key = p.getString("api_key", "");
+        if (!key.isEmpty()) {
+            try {
+                String sys = "你係 YupiSaver 嘅主動陪伴引擎。用戶冇主動提問，而家只需要收到一句自然、溫柔、唔打擾嘅廣東話安慰。\n"
+                        + "最近記錄（只作為理解氣氛，唔好直接洩露敏感內容）：\n" + recordsContext(ctx, 5) + "\n"
+                        + "規則：\n"
+                        + "1. 只寫一句 30-60 字嘅廣東話安慰，具體但唔好太戲劇化。\n"
+                        + "2. 唔好問問題、唔好叫用戶做任何事、唔好用『你應該』『你必須』，唔好以『收到』『OK』開頭。\n"
+                        + "3. 唔好提 AI、定時、生成、通知或呢個提示本身；唔好假裝知道用戶一定發生咗乜。\n"
+                        + "4. 避免重複最近記錄和常見句式，語氣要像安靜陪伴；可以按內容揀 calm／sad／happy／fluent，但一般以 calm 為主。\n"
+                        + "5. tag 只在句子明確有嘆氣、笑聲或呼吸字眼時使用，否則留空。\n"
+                        + "只輸出 JSON：{\"emotion\":\"calm\",\"tag\":\"\",\"reply\":\"...\"}";
+                String out = DeepSeekClient.chat(
+                        p.getString("base_url", "https://api.deepseek.com"),
+                        key, p.getString("model", "deepseek-chat"), sys,
+                        "請給我一句此刻適合收到的安慰。", 700, thinking(ctx)).trim();
+                String reply = "";
+                String emotion = "";
+                String aiTag = "";
+                try {
+                    JSONObject j = new JSONObject(extractJson(out));
+                    reply = j.optString("reply", "").trim();
+                    emotion = emotionForContent(reply, j.optString("emotion", ""));
+                    aiTag = safeTag(j.optString("tag", ""));
+                } catch (Exception ignored) {
+                    // 某些兼容接口會忽略 JSON 要求；純文字仍可安全使用。
+                    reply = out.replace("\"", "").trim();
+                    emotion = emotionForContent(reply, "");
+                }
+                String tag = contentMatch(reply, aiTag) ? aiTag : "";
+                if (tag.isEmpty()) tag = suggestTag(reply, emotion);
+                tag = throttleTag(tag);
+                if (!reply.isEmpty() && reply.length() >= 8 && reply.length() <= 150) {
+                    DebugLog.add("AI", "主動安慰 OK: emotion=" + emotion + " | tag=" + tag
+                            + " | reply=" + truncate(reply, 80));
+                    return new Response("other", reply, null,
+                            emotion.isEmpty() ? "calm" : emotion, tag);
+                }
+                DebugLog.add("AI", "主動安慰解析失敗 → fallback 池");
+            } catch (Exception e) {
+                DebugLog.add("AI", "主動安慰異常: " + e.getClass().getSimpleName());
+            }
+        }
+        int idx;
+        do {
+            idx = Math.abs(new Random().nextInt()) % PROACTIVE_COMFORT.length;
+        } while (idx == proactiveIdx && PROACTIVE_COMFORT.length > 1);
+        proactiveIdx = idx;
+        String reply = PROACTIVE_COMFORT[idx];
+        return new Response("other", reply, null, "calm", throttleTag(suggestTag(reply, "calm")));
     }
 
     /** 感恩練習引導句：每次唔同，引導佢諗「而家擁有／已經得到咗」啲乜。 */

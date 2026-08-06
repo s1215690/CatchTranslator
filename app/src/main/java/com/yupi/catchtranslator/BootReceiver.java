@@ -28,5 +28,13 @@ public class BootReceiver extends BroadcastReceiver {
                 else ctx.startService(i);
             } catch (Exception ignored) {}
         }
+        if (p.getBoolean(ActiveComfortService.PREF_ENABLED, false)) {
+            try {
+                Intent i = new Intent(ctx, ActiveComfortService.class)
+                        .setAction(ActiveComfortService.ACTION_START);
+                if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
+                else ctx.startService(i);
+            } catch (Exception ignored) {}
+        }
     }
 }
