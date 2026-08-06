@@ -8,8 +8,6 @@ import android.os.Looper;
 import android.speech.tts.TextToSpeech;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,6 +21,7 @@ public class VoicePlayer {
     private static final ExecutorService POOL = Executors.newSingleThreadExecutor();
     private static TextToSpeech tts;
     private static boolean ttsReady = false;
+    private static boolean legacyCacheCleared = false;
 
     /** 語音引擎失敗回退系統聲時通知 UI（等用戶知道唔係設定冇用）。 */
     public interface FallbackListener {
@@ -56,6 +55,7 @@ public class VoicePlayer {
      */
     public static void speak(final Context ctx, final String text, final String emotionOverride, final String tag) {
         if (text == null || text.isEmpty()) return;
+        clearLegacyCacheOnce(ctx);
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         String engine = p.getString("voice_engine", "system");
         final String ratePct = p.getString("voice_rate", "0");
@@ -67,15 +67,15 @@ public class VoicePlayer {
                     : "cn".equals(edgeVoice) ? EdgeTts.VOICE_CN : EdgeTts.VOICE_HK;
             final String pitch = edgePitch(p.getString("edge_style", ""));
             POOL.execute(() -> {
-                File out = cachedFile(ctx, text, voice + "|" + pitch, ratePct);
+                File out = null;
                 try {
-                    if (!out.exists()) {
-                        DebugLog.add("TTS", "Edge 合成中: " + truncate(text, 50));
-                        EdgeTts.synthesize(text, voice, ratePct, pitch, out);
-                    }
+                    out = freshAudioFile(ctx);
+                    DebugLog.add("TTS", "Edge 重新合成中: " + truncate(text, 50));
+                    EdgeTts.synthesize(text, voice, ratePct, pitch, out);
                     final File f = out;
                     MAIN.post(() -> playFile(ctx, f, text, ratePct));
                 } catch (Exception e) {
+                    deleteQuietly(out);
                     DebugLog.add("TTS", "Edge 失敗: " + truncate(e.getMessage(), 100));
                     if (tryMiniMax(ctx, p, text, emotionOverride, tag, ratePct)) return; // 回退鏈
                     notifyFallback(engine, e.getMessage());
@@ -89,16 +89,16 @@ public class VoicePlayer {
             final String mmEmotion = (emotionOverride != null && !emotionOverride.isEmpty())
                     ? emotionOverride : p.getString("minimax_emotion", "");
             POOL.execute(() -> {
-                String finalText = MiniMaxTts.applyTag(text, tag); // 標籤先入 text，再入 cache key
-                File out = cachedFile(ctx, finalText, mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
+                String finalText = MiniMaxTts.applyTag(text, tag);
+                File out = null;
                 try {
-                    if (!out.exists()) {
-                        DebugLog.add("TTS", "MiniMax 合成中: " + truncate(finalText, 50));
-                        MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
-                    }
+                    out = freshAudioFile(ctx);
+                    DebugLog.add("TTS", "MiniMax 重新合成中: " + truncate(finalText, 50));
+                    MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
                     final File f = out;
                     MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
                 } catch (Exception e) {
+                    deleteQuietly(out);
                     DebugLog.add("TTS", "MiniMax 失敗: " + truncate(e.getMessage(), 100));
                     notifyFallback(engine, e.getMessage());
                     playSystem(ctx, text, ratePct);
@@ -128,22 +128,22 @@ public class VoicePlayer {
             DebugLog.add("TTS", "回退 MiniMax: 冇 key，跳過");
             return false;
         }
+        File out = null;
         try {
             String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
             String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
             String mmEmotion = (emotion != null && !emotion.isEmpty())
                     ? emotion : p.getString("minimax_emotion", "");
             String finalText = MiniMaxTts.applyTag(text, tag);
-            File out = cachedFile(ctx, finalText, "mm-fb|" + mmVoice + "|" + mmModel + "|" + mmEmotion, ratePct);
-            if (!out.exists()) {
-                DebugLog.add("TTS", "回退合成中（MiniMax）: " + truncate(finalText, 50));
-                MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
-            }
+            out = freshAudioFile(ctx);
+            DebugLog.add("TTS", "回退重新合成中（MiniMax）: " + truncate(finalText, 50));
+            MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
             final File f = out;
             MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
             DebugLog.add("TTS", "Edge→MiniMax 回退成功");
             return true;
         } catch (Exception e2) {
+            deleteQuietly(out);
             DebugLog.add("TTS", "回退 MiniMax 失敗: " + truncate(e2.getMessage(), 100));
             return false;
         }
@@ -154,24 +154,41 @@ public class VoicePlayer {
         return s.length() > n ? s.substring(0, n) + "…" : s;
     }
 
-    /** 按文字＋聲線＋語速做快取 key：同一句講過就唔使再合成。 */
-    private static File cachedFile(Context ctx, String text, String voice, String ratePct) {
-        File dir = new File(ctx.getCacheDir(), "tts_cache");
-        //noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        return new File(dir, md5(text + "|" + voice + "|" + ratePct) + ".mp3");
+    /** 每次合成都用全新臨時檔，播放完即刪，唔會重用舊錄音。 */
+    private static File freshAudioFile(Context ctx) throws Exception {
+        File dir = new File(ctx.getCacheDir(), "tts_temp");
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new Exception("無法建立語音臨時目錄");
+        }
+        return File.createTempFile("tts_", ".mp3", dir);
     }
 
-    private static String md5(String s) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] d = md.digest(s.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : d) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (Exception e) {
-            return String.valueOf(s.hashCode());
+    /** 升級後第一次播聲時清走舊版本留下嘅可重用錄音。 */
+    private static synchronized void clearLegacyCacheOnce(Context ctx) {
+        if (legacyCacheCleared) return;
+        File dir = new File(ctx.getCacheDir(), "tts_cache");
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) deleteQuietly(file);
         }
+        if (dir.exists()) deleteQuietly(dir);
+        legacyCacheCleared = true;
+    }
+
+    private static void deleteQuietly(File file) {
+        if (file == null || !file.exists()) return;
+        //noinspection ResultOfMethodCallIgnored
+        file.delete();
+    }
+
+    /** 播放一次性合成檔；完成或失敗後都會刪除。可供音色設計試聽使用。 */
+    public static void playTemporaryFile(final Context ctx, final File file,
+                                         final String fallbackText, final String ratePct) {
+        if (file == null || !file.exists()) {
+            playSystem(ctx, fallbackText, ratePct);
+            return;
+        }
+        MAIN.post(() -> playFile(ctx, file, fallbackText, ratePct));
     }
 
     private static void playFile(final Context ctx, final File f, final String fallbackText, final String ratePct) {
@@ -179,13 +196,18 @@ public class VoicePlayer {
             MediaPlayer mp = new MediaPlayer();
             mp.setDataSource(f.getAbsolutePath());
             mp.setOnPreparedListener(MediaPlayer::start);
-            mp.setOnCompletionListener(m -> m.release());
+            mp.setOnCompletionListener(m -> {
+                m.release();
+                deleteQuietly(f);
+            });
             mp.setOnErrorListener((m, what, extra) -> {
                 try { m.release(); } catch (Exception ignored) {}
+                deleteQuietly(f);
                 return true;
             });
             mp.prepareAsync();
         } catch (Exception e) {
+            deleteQuietly(f);
             playSystem(ctx, fallbackText, ratePct);
         }
     }

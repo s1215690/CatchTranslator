@@ -1,6 +1,7 @@
 package com.yupi.catchtranslator;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -20,6 +21,13 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 /** 主頁：設定 API key + 開關懸浮按鈕 + 睇記錄。 */
 public class MainActivity extends Activity {
 
@@ -37,6 +45,11 @@ public class MainActivity extends Activity {
     private EditText etMiniMaxKey;
     private Spinner spMiniMaxVoice, spMiniMaxModel, spMiniMaxEmotion;
     private LinearLayout llMiniMax;
+    private Button btnDesignVoice;
+    private TextView tvVoiceDesignStatus;
+    private final List<String> miniMaxVoiceIds = new ArrayList<>();
+    private final List<String> miniMaxVoiceLabels = new ArrayList<>();
+    private ArrayAdapter<String> miniMaxVoiceAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,13 +78,15 @@ public class MainActivity extends Activity {
         spMiniMaxModel = findViewById(R.id.spMiniMaxModel);
         spMiniMaxEmotion = findViewById(R.id.spMiniMaxEmotion);
         llMiniMax = findViewById(R.id.llMiniMax);
+        btnDesignVoice = findViewById(R.id.btnDesignVoice);
+        tvVoiceDesignStatus = findViewById(R.id.tvVoiceDesignStatus);
         llEdge = findViewById(R.id.llEdge);
         spEdgeVoice = findViewById(R.id.spEdgeVoice);
         spEdgeStyle = findViewById(R.id.spEdgeStyle);
-        ArrayAdapter<String> mmAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, MiniMaxTts.VOICE_LABELS);
-        mmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spMiniMaxVoice.setAdapter(mmAdapter);
+        miniMaxVoiceAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, miniMaxVoiceLabels);
+        miniMaxVoiceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spMiniMaxVoice.setAdapter(miniMaxVoiceAdapter);
         ArrayAdapter<String> mmModelAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, MiniMaxTts.MODEL_LABELS);
         mmModelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -120,6 +135,7 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, "已發送 ✅", Toast.LENGTH_SHORT).show()));
         });
         findViewById(R.id.btnTest).setOnClickListener(v -> test());
+        btnDesignVoice.setOnClickListener(v -> showVoiceDesignDialog());
         findViewById(R.id.btnStop).setOnClickListener(v -> {
             getSharedPreferences("settings", MODE_PRIVATE)
                     .edit().putBoolean("floating_enabled", false).apply();
@@ -212,12 +228,9 @@ public class MainActivity extends Activity {
         spEdgeVoice.setSelection(indexOf(EDGE_VOICE_VALUES, p.getString("edge_voice", "hk-f")));
         spEdgeStyle.setSelection(indexOf(EDGE_STYLE_VALUES, p.getString("edge_style", "")));
         etMiniMaxKey.setText(p.getString("minimax_key", ""));
-        int mmPos = 0;
         String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
-        for (int i = 0; i < MiniMaxTts.VOICE_IDS.length; i++) {
-            if (MiniMaxTts.VOICE_IDS[i].equals(mmVoice)) { mmPos = i; break; }
-        }
-        spMiniMaxVoice.setSelection(mmPos);
+        reloadMiniMaxVoices(p);
+        spMiniMaxVoice.setSelection(Math.max(0, miniMaxVoiceIds.indexOf(mmVoice)));
         int mmModelPos = 0;
         String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
         for (int i = 0; i < MiniMaxTts.MODEL_IDS.length; i++) {
@@ -273,7 +286,7 @@ public class MainActivity extends Activity {
                 .putString("debug_chat_id", etDebugChatId.getText().toString().trim())
                 .putString("minimax_key", etMiniMaxKey.getText().toString().trim())
                 .putString("minimax_voice",
-                        MiniMaxTts.VOICE_IDS[Math.max(0, spMiniMaxVoice.getSelectedItemPosition())])
+                        selectedMiniMaxVoiceId())
                 .putString("minimax_model",
                         MiniMaxTts.MODEL_IDS[Math.max(0, spMiniMaxModel.getSelectedItemPosition())])
                 .putString("minimax_emotion",
@@ -286,6 +299,170 @@ public class MainActivity extends Activity {
                 .putBoolean("thinking_enabled", cbThinking.isChecked())
                 .apply();
         Toast.makeText(this, "已儲存", Toast.LENGTH_SHORT).show();
+    }
+
+    private String selectedMiniMaxVoiceId() {
+        int position = spMiniMaxVoice.getSelectedItemPosition();
+        if (position >= 0 && position < miniMaxVoiceIds.size()) {
+            return miniMaxVoiceIds.get(position);
+        }
+        return MiniMaxTts.VOICE_IDS[0];
+    }
+
+    private void reloadMiniMaxVoices(SharedPreferences p) {
+        miniMaxVoiceIds.clear();
+        miniMaxVoiceLabels.clear();
+        for (int i = 0; i < MiniMaxTts.VOICE_IDS.length; i++) {
+            miniMaxVoiceIds.add(MiniMaxTts.VOICE_IDS[i]);
+            miniMaxVoiceLabels.add(MiniMaxTts.VOICE_LABELS[i]);
+        }
+        try {
+            JSONArray saved = new JSONArray(p.getString("minimax_designed_voices", "[]"));
+            for (int i = 0; i < saved.length(); i++) {
+                JSONObject item = saved.optJSONObject(i);
+                if (item == null) continue;
+                String id = item.optString("id", "").trim();
+                String name = item.optString("name", "").trim();
+                if (id.isEmpty() || miniMaxVoiceIds.contains(id)) continue;
+                miniMaxVoiceIds.add(id);
+                miniMaxVoiceLabels.add(name.isEmpty() ? "自訂聲線" : "自訂 · " + name);
+            }
+        } catch (Exception ignored) {
+            // 舊設定或損壞資料不影響四把內置聲線。
+        }
+        miniMaxVoiceAdapter.notifyDataSetChanged();
+    }
+
+    private void showVoiceDesignDialog() {
+        final int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, 0, pad, 0);
+
+        EditText prompt = new EditText(this);
+        prompt.setHint("例如：香港年輕女生，聲音甜美自然、有親和力，不要播音腔");
+        prompt.setMinLines(3);
+        prompt.setMaxLines(5);
+        box.addView(prompt, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        EditText preview = new EditText(this);
+        preview.setHint("粵語試聽文字");
+        preview.setText("你好呀，今日過得點？唔使心急，慢慢講畀我聽。");
+        preview.setMinLines(2);
+        preview.setMaxLines(4);
+        box.addView(preview, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView note = new TextView(this);
+        note.setText("生成後會再用目前模型合成一次試聽，以正式啟用聲線。MiniMax 會收取音色設計及合成費用。");
+        note.setTextSize(12);
+        note.setTextColor(0xFF7FA88F);
+        note.setPadding(0, Math.round(8 * getResources().getDisplayMetrics().density), 0, 0);
+        box.addView(note);
+
+        new AlertDialog.Builder(this)
+                .setTitle("設計 MiniMax 粵語聲線")
+                .setView(box)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("生成並試聽", (dialog, which) ->
+                        startVoiceDesign(prompt.getText().toString(), preview.getText().toString()))
+                .show();
+    }
+
+    private void startVoiceDesign(String prompt, String previewText) {
+        final String key = etMiniMaxKey.getText().toString().trim();
+        final String description = prompt == null ? "" : prompt.trim();
+        final String sample = previewText == null ? "" : previewText.trim();
+        if (key.isEmpty()) {
+            Toast.makeText(this, "請先填 MiniMax API Key", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (description.isEmpty() || sample.isEmpty()) {
+            Toast.makeText(this, "聲線描述和粵語試聽文字都要填", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (description.length() > 500 || sample.length() > 500) {
+            Toast.makeText(this, "描述和試聽文字最多各 500 字", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        btnDesignVoice.setEnabled(false);
+        tvVoiceDesignStatus.setText("正在設計聲線，通常需要十幾秒…");
+        final String model = MiniMaxTts.MODEL_IDS[Math.max(0, spMiniMaxModel.getSelectedItemPosition())];
+        final String emotion = MiniMaxTts.EMOTION_IDS[Math.max(0, spMiniMaxEmotion.getSelectedItemPosition())];
+        final String rate = getSharedPreferences("settings", MODE_PRIVATE)
+                .getString("voice_rate", "0");
+
+        new Thread(() -> {
+            File previewFile = null;
+            String designedVoiceId = null;
+            try {
+                designedVoiceId = MiniMaxTts.designVoice(key, description, sample);
+                rememberDesignedVoice(description, designedVoiceId);
+
+                previewFile = File.createTempFile("voice_design_", ".mp3", getCacheDir());
+                MiniMaxTts.synthesize(key, sample, designedVoiceId, model, rate,
+                        emotion, null, previewFile);
+                File finalPreviewFile = previewFile;
+                String finalDesignedVoiceId = designedVoiceId;
+                runOnUiThread(() -> {
+                    selectDesignedVoice(finalDesignedVoiceId, key);
+                    btnDesignVoice.setEnabled(true);
+                    tvVoiceDesignStatus.setText("已生成並啟用 ✅ 正在播放試聽");
+                    VoicePlayer.playTemporaryFile(this, finalPreviewFile, sample, rate);
+                });
+            } catch (Exception e) {
+                if (previewFile != null && previewFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    previewFile.delete();
+                }
+                String finalDesignedVoiceId = designedVoiceId;
+                runOnUiThread(() -> {
+                    if (finalDesignedVoiceId != null) selectDesignedVoice(finalDesignedVoiceId, key);
+                    btnDesignVoice.setEnabled(true);
+                    tvVoiceDesignStatus.setText(finalDesignedVoiceId == null
+                            ? "生成失敗 ❌" : "聲線已生成，但啟用試聽失敗 ⚠️");
+                    Toast.makeText(this, "MiniMax：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    private void rememberDesignedVoice(String description, String voiceId) throws Exception {
+        SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
+        JSONArray saved;
+        try {
+            saved = new JSONArray(p.getString("minimax_designed_voices", "[]"));
+        } catch (Exception e) {
+            saved = new JSONArray();
+        }
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject item = saved.optJSONObject(i);
+            if (item != null && voiceId.equals(item.optString("id"))) return;
+        }
+        JSONObject item = new JSONObject();
+        item.put("id", voiceId);
+        item.put("name", shortVoiceName(description));
+        saved.put(item);
+        p.edit().putString("minimax_designed_voices", saved.toString()).apply();
+    }
+
+    private void selectDesignedVoice(String voiceId, String key) {
+        SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
+        p.edit()
+                .putString("minimax_key", key)
+                .putString("minimax_voice", voiceId)
+                .putString("voice_engine", "minimax")
+                .apply();
+        reloadMiniMaxVoices(p);
+        spMiniMaxVoice.setSelection(Math.max(0, miniMaxVoiceIds.indexOf(voiceId)));
+        rgVoice.check(R.id.rbVoiceMiniMax);
+    }
+
+    private static String shortVoiceName(String description) {
+        String oneLine = description.replace('\n', ' ').trim();
+        return oneLine.length() <= 18 ? oneLine : oneLine.substring(0, 18) + "…";
     }
 
     private void test() {

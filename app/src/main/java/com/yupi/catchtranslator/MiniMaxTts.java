@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 public class MiniMaxTts {
 
     private static final String ENDPOINT = "https://api.minimaxi.com/v1/t2a_v2";
+    private static final String VOICE_DESIGN_ENDPOINT = "https://api.minimaxi.com/v1/voice_design";
 
     /** 官方 API 粵語聲線（唔好用 APIXO preset_cantonese_xxx，官方 key 會報 voice id not exist）。 */
     public static final String[] VOICE_IDS = {
@@ -107,6 +108,51 @@ public class MiniMaxTts {
         try (FileOutputStream fos = new FileOutputStream(out)) {
             fos.write(audio);
         }
+    }
+
+    /**
+     * 按文字描述設計新音色。接口會回傳一個 voice_id；之後以該 voice_id 呼叫 T2A，
+     * 音色才會正式啟用並長期保留。
+     */
+    public static String designVoice(String apiKey, String prompt, String previewText) throws Exception {
+        if (apiKey == null || apiKey.trim().isEmpty()) throw new Exception("未填 MiniMax API Key");
+        if (prompt == null || prompt.trim().isEmpty()) throw new Exception("請輸入聲線描述");
+        if (previewText == null || previewText.trim().isEmpty()) throw new Exception("請輸入粵語試聽文字");
+        if (prompt.length() > 500) throw new Exception("聲線描述最多 500 字");
+        if (previewText.length() > 500) throw new Exception("試聽文字最多 500 字");
+
+        JSONObject body = new JSONObject();
+        body.put("prompt", prompt.trim());
+        body.put("preview_text", previewText.trim());
+        body.put("aigc_watermark", false);
+
+        HttpURLConnection c = (HttpURLConnection) new URL(VOICE_DESIGN_ENDPOINT).openConnection();
+        c.setRequestMethod("POST");
+        c.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+        c.setRequestProperty("Content-Type", "application/json");
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(60000);
+        c.setDoOutput(true);
+        try (OutputStream os = c.getOutputStream()) {
+            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        int code = c.getResponseCode();
+        InputStream is = code >= 400 ? c.getErrorStream() : c.getInputStream();
+        String resp = readAll(is);
+        if (code != 200) {
+            throw new Exception("MiniMax Voice Design HTTP " + code + ": " + truncate(resp, 240));
+        }
+
+        JSONObject j = new JSONObject(resp);
+        JSONObject br = j.optJSONObject("base_resp");
+        if (br == null || br.optInt("status_code", -1) != 0) {
+            throw new Exception("MiniMax 音色設計失敗: "
+                    + (br == null ? "缺少 base_resp" : br.optString("status_msg")));
+        }
+        String voiceId = j.optString("voice_id", "").trim();
+        if (voiceId.isEmpty()) throw new Exception("MiniMax 沒有回傳 voice_id");
+        return voiceId;
     }
 
     /**

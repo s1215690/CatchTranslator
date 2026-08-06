@@ -123,7 +123,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="TG Chat ID（可選，例如 5517170901）"
+            android:hint="TG Chat ID（可選，例如 123456789）"
             android:inputType="number"
             android:maxLines="1" />
 
@@ -370,6 +370,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp" />
 
+            <Button
+                android:id="@+id/btnDesignVoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/btn_bg"
+                android:text="＋ 設計新粵語聲線"
+                android:textColor="#2E7D5B"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvVoiceDesignStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="可以用文字描述生成自訂聲線；生成後會自動加入上面的聲線列表。"
+                android:textColor="#7FA88F"
+                android:textSize="12sp" />
+
             <CheckBox
                 android:id="@+id/cbMiniMaxTurbo"
                 android:layout_width="wrap_content"
@@ -408,7 +427,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="MiniMax 用官方粵語聲線（Cantonese_ 開頭），自動講地道廣東話；揀咗 MiniMax 但冇入 Key 會自動用返系統語音。"
+                android:text="內置聲線和自訂聲線都會用 Chinese,Yue 粵語增強。揀咗 MiniMax 但冇入 Key 會自動用返系統語音。"
                 android:textSize="12sp"
                 android:textColor="#7FA88F" />
         </LinearLayout>
