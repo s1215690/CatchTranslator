@@ -301,7 +301,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="按指定間隔生成一句溫柔安慰，再用目前語音引擎播出；偵測到其他音樂或語音時會暫停。"
+            android:text="按指定間隔生成一句溫柔安慰，再用目前語音引擎播出；可輸入 0–300 分鐘。偵測到其他音樂或語音時會暫停。"
             android:textSize="13sp"
             android:textColor="#7FA88F" />
 
@@ -336,7 +336,7 @@
                 android:gravity="center"
                 android:hint="20"
                 android:inputType="number"
-                android:maxLength="2"
+                android:maxLength="3"
                 android:maxLines="1"
                 android:selectAllOnFocus="true"
                 android:textSize="16sp" />

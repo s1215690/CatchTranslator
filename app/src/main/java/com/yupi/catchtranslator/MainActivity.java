@@ -680,8 +680,9 @@ public class MainActivity extends Activity {
         if (enabled && !ActiveComfortService.isRunning()) {
             startActiveComfortService(ActiveComfortService.ACTION_START);
         }
+        String intervalLabel = activeComfortIntervalLabel(minutes);
         tvActiveComfortStatus.setText(enabled
-                ? "主動安慰已開啟 · 每 " + minutes + " 分鐘生成並播出（其他播放時會暫停）"
+                ? "主動安慰已開啟 · 每 " + intervalLabel + "生成並播出（其他播放時會暫停）"
                 : "目前未啟用");
     }
 
@@ -705,7 +706,8 @@ public class MainActivity extends Activity {
                 .getBoolean(ActiveComfortService.PREF_ENABLED, false)) {
             startActiveComfortService(ActiveComfortService.ACTION_START);
         }
-        tvActiveComfortStatus.setText("主動安慰已設定為每 " + minutes + " 分鐘");
+        tvActiveComfortStatus.setText("主動安慰已設定為每 "
+                + activeComfortIntervalLabel(minutes));
     }
 
     private void applyActiveComfortInterval() {
@@ -714,16 +716,20 @@ public class MainActivity extends Activity {
         try {
             minutes = Integer.parseInt(raw);
         } catch (Exception e) {
-            Toast.makeText(this, "請輸入分鐘數（15–30）", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "請輸入分鐘數（0–300）", Toast.LENGTH_SHORT).show();
             return;
         }
         if (minutes < ActiveComfortService.MIN_INTERVAL_MINUTES
                 || minutes > ActiveComfortService.MAX_INTERVAL_MINUTES) {
-            Toast.makeText(this, "請輸入 15–30 分鐘內的整數", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "請輸入 0–300 分鐘內的整數", Toast.LENGTH_SHORT).show();
             return;
         }
         etActiveComfortInterval.clearFocus();
         setActiveComfortInterval(minutes);
+    }
+
+    private static String activeComfortIntervalLabel(int minutes) {
+        return minutes == 0 ? "0 分鐘（安全最短 1 分鐘）" : minutes + " 分鐘";
     }
 
     private void startActiveComfortService(String action) {

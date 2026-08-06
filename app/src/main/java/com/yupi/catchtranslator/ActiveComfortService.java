@@ -30,9 +30,10 @@ public class ActiveComfortService extends Service {
 
     private static final int NOTIFICATION_ID = 8;
     public static final int DEFAULT_INTERVAL_MINUTES = 20;
-    public static final int MIN_INTERVAL_MINUTES = 15;
-    public static final int MAX_INTERVAL_MINUTES = 30;
+    public static final int MIN_INTERVAL_MINUTES = 0;
+    public static final int MAX_INTERVAL_MINUTES = 300;
     private static final long BUSY_RETRY_MS = 2 * 60 * 1000L;
+    private static final long ZERO_INTERVAL_SAFE_DELAY_MS = 60 * 1000L;
 
     private static volatile boolean running;
 
@@ -72,8 +73,8 @@ public class ActiveComfortService extends Service {
             stopSelfSafely();
             return START_NOT_STICKY;
         }
-        scheduleAfter(getIntervalMinutes(this) * 60_000L);
-        updateStatus("已開啟 · 每 " + getIntervalMinutes(this) + " 分鐘陪伴一次");
+        scheduleAfter(intervalDelayMs());
+        updateStatus("已開啟 · 每 " + intervalDescription() + " 陪伴一次");
         return START_STICKY;
     }
 
@@ -142,8 +143,18 @@ public class ActiveComfortService extends Service {
             DebugLog.add("Comfort", "儲存主動安慰記錄失敗: " + e.getClass().getSimpleName());
         }
         VoicePlayer.speak(this, response.reply, response.emotion, response.tag);
-        updateStatus("剛剛已播放安慰 · 下次每 " + getIntervalMinutes(this) + " 分鐘");
-        scheduleAfter(getIntervalMinutes(this) * 60_000L);
+        updateStatus("剛剛已播放安慰 · 下次每 " + intervalDescription());
+        scheduleAfter(intervalDelayMs());
+    }
+
+    private long intervalDelayMs() {
+        int minutes = getIntervalMinutes(this);
+        return minutes == 0 ? ZERO_INTERVAL_SAFE_DELAY_MS : minutes * 60_000L;
+    }
+
+    private String intervalDescription() {
+        int minutes = getIntervalMinutes(this);
+        return minutes == 0 ? "0 分鐘（安全最短 1 分鐘）" : minutes + " 分鐘";
     }
 
     private void createChannel() {
