@@ -225,6 +225,68 @@ public class AiEngine {
         return fallback(text, narration, btnCount);
     }
 
+    /** 感恩練習引導句：每次唔同，引導佢諗「而家擁有／已經得到咗」啲乜。 */
+    public static String gratitudePrompt(Context ctx) {
+        SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        String key = p.getString("api_key", "");
+        if (!key.isEmpty()) {
+            try {
+                String sys = "你係感恩練習嘅引導者。用戶啱啱撳咗感恩按鈕。"
+                        + "用廣東話寫一句25-40字嘅引導句，引導佢諗下「而家擁有咩／已經得到咗咩」："
+                        + "要具體、溫柔、唔好問「點解」、唔好用「你應該」、每次用詞都要唔同、唔好講大道理。"
+                        + "直接輸出嗰一句，唔好加引號。";
+                String out = DeepSeekClient.chat(
+                        p.getString("base_url", "https://api.deepseek.com"),
+                        key, p.getString("model", "deepseek-chat"), sys,
+                        "畀我一句感恩引導。", 400, thinking(ctx)).trim();
+                if (!out.isEmpty() && out.length() <= 60) return out;
+            } catch (Exception e) {
+                DebugLog.add("AI", "感恩引導異常: " + e.getClass().getSimpleName());
+            }
+        }
+        return GRATITUDE_PROMPTS[Math.abs(new Random().nextInt()) % GRATITUDE_PROMPTS.length];
+    }
+
+    /** 感恩回應：用戶講咗佢擁有／得到嘅嘢，AI 溫暖回應。 */
+    public static String gratitudeReply(Context ctx, String text) {
+        SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        String key = p.getString("api_key", "");
+        if (!key.isEmpty()) {
+            try {
+                String sys = "你係感恩練習嘅回應者。用戶講咗佢擁有／已經得到咗嘅嘢：「" + truncate(text, 150) + "」。"
+                        + "用廣東話寫30-60字嘅溫暖回應：肯定佢擁有嘅嘢、幫佢記住呢一刻係真嘅、"
+                        + "唔好講道理、唔好用「你應該」、唔好問問題、唔好以「收到」開頭。"
+                        + "直接輸出回應，唔好加引號。";
+                String out = DeepSeekClient.chat(
+                        p.getString("base_url", "https://api.deepseek.com"),
+                        key, p.getString("model", "deepseek-chat"), sys,
+                        "回應我擁有嘅嘢。", 500, thinking(ctx)).trim();
+                if (!out.isEmpty() && out.length() <= 100) return out;
+            } catch (Exception e) {
+                DebugLog.add("AI", "感恩回應異常: " + e.getClass().getSimpleName());
+            }
+        }
+        return GRATITUDE_REPLIES[Math.abs(new Random().nextInt()) % GRATITUDE_REPLIES.length];
+    }
+
+    private static final String[] GRATITUDE_PROMPTS = {
+            "試下諗下：你而家擁有啲乜嘢？床？熱水？有個狗仔等你？",
+            "唔使諗大嘅嘢——淨係諗下你今日用到嘅：一杯水、一盞燈、一張被。",
+            "你已經得到咗啲乜嘢？可以係好細嘅嘢：啱啱嗰啖氣、個枕頭、一部電話。",
+            "諗下邊樣嘢係你而家有、但以前冇嘅？",
+            "唔使急，靜靜諗下：你擁有嘅嘢入面，邊樣最細、但最實在？",
+            "今日有咩嘢係企咗喺你身邊？唔使大，係真嘅就得。",
+            "你已經有嘅嘢，邊樣係你平時唔會特別記得、但冇咗會好唔慣嘅？",
+    };
+
+    private static final String[] GRATITUDE_REPLIES = {
+            "好，你講得出嚟，就係真嘅擁有。",
+            "呢啲就係你嘅——記住佢哋喺度。",
+            "你擁有嘅嘢，唔使好大，係真嘅就夠。",
+            "呢一刻你講得出嘅，都係你袋袋平安嘅。",
+            "好，收好呢樣嘢——佢係你嘅。",
+    };
+
     /** 單行回應（反駁／問題等）。冇 key 或者連唔到線就畀一句兜底。 */
     public static String oneLine(Context ctx, String sys, String userMsg) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);

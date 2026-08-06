@@ -72,10 +72,12 @@ public class FloatingService extends Service {
     private TextView statusText;
     private EditText inputBox;
     private Button nudgeBtn;
+    private Button btnGratitude;
     private LinearLayout llButtons;
 
     private NudgeManager nudge;
     private boolean pendingNudge = false;
+    private boolean pendingGratitude = false;
     private LinearLayout llFollowup;
     private Button btnFollow1, btnFollow2;
 
@@ -339,6 +341,7 @@ public class FloatingService extends Service {
             }
         });
         nudgeBtn = panel.findViewById(R.id.btnNudge);
+        btnGratitude = panel.findViewById(R.id.btnGratitude);
         String hint = todayHint();
         if (hint != null) {
             nudgeBtn.setText("🚀 今日建議：「" + hint + "」");
@@ -346,6 +349,7 @@ public class FloatingService extends Service {
             nudgeBtn.setText("🚀 推動力：想做咩？講出嚟");
         }
         nudgeBtn.setOnClickListener(v -> onNudgeTap());
+        btnGratitude.setOnClickListener(v -> onGratitudeTap());
         llFollowup = panel.findViewById(R.id.llFollowup);
         btnFollow1 = panel.findViewById(R.id.btnFollow1);
         btnFollow2 = panel.findViewById(R.id.btnFollow2);
@@ -415,6 +419,11 @@ public class FloatingService extends Service {
     // ---------- 捕捉記錄 ----------
 
     private void record(final String text, final String source) {
+        if (pendingGratitude && !source.equals("button")) {
+            pendingGratitude = false;
+            handleGratitude(text);
+            return;
+        }
         if (pendingNudge && !source.equals("button")) {
             pendingNudge = false;
             startNudge(text);
@@ -422,6 +431,7 @@ public class FloatingService extends Service {
         }
         feedbackOk();
         if (source.equals("button")) {
+            pendingGratitude = false;
             new TranslatorDb(this).insert("按鈕", text, source);
             getSharedPreferences("settings", MODE_PRIVATE)
                     .edit().putString("last_button", text).apply();
@@ -631,6 +641,32 @@ public class FloatingService extends Service {
                 setStatus("🚀 講出你想做嘅嘢…（用🎤或者打字後撳送出）");
             }
         }
+    }
+
+    /** 🙏 感恩練習：AI 引導，用戶自己講出擁有／得到嘅嘢，AI 溫暖回應＋語音。 */
+    private void onGratitudeTap() {
+        pendingGratitude = true;
+        setStatus("🙏 諗緊點引導你…");
+        pool.execute(() -> {
+            final String guide = AiEngine.gratitudePrompt(this);
+            ui.post(() -> {
+                setStatus("🙏 " + guide + "（用🎤或者打字講低你擁有嘅嘢）");
+                VoicePlayer.speak(this, guide);
+            });
+        });
+    }
+
+    /** 用戶講咗擁有嘅嘢 → AI 溫暖回應＋記錄。 */
+    private void handleGratitude(final String text) {
+        setStatus("🙏 諗緊點回應你…");
+        pool.execute(() -> {
+            final String reply = AiEngine.gratitudeReply(this, text);
+            new TranslatorDb(this).insert("感恩", text, "gratitude");
+            ui.post(() -> {
+                VoicePlayer.speak(this, reply);
+                setStatus("🙏 已記低：「" + text + "」｜" + reply);
+            });
+        });
     }
 
     private void startNudge(String text) {

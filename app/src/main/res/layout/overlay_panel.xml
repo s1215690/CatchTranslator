@@ -128,6 +128,17 @@
     </LinearLayout>
 
     <Button
+        android:id="@+id/btnGratitude"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/btn_bg"
+        android:minHeight="44dp"
+        android:text="🙏 想像你而家擁有乜嘢——想想你已經得到咗啲乜"
+        android:textSize="13sp"
+        android:textColor="#2E7D5B" />
+
+    <Button
         android:id="@+id/btnNudge"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
