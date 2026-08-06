@@ -52,27 +52,41 @@ public class AiEngine {
 
     /**
      * 根據回應內容＋語氣，App 端自動補一個語氣標籤（AI 冇俾／俾錯嗰陣兜底）。
-     * 規則：開心感嘆 → 笑；嘆氣位 → sighs；驚訝位 → gasps；猶豫位 → emm。
+     * 標籤係「稀有調味」：明確表情位先用，而且只 40% 概率落（唔會每句都帶聲）。
+     * 規則：明確嘆氣詞 → sighs；驚訝位 → gasps；開心感嘆 → laughs；猶豫位 → emm。
      */
+    private static final Random TAG_RND = new Random();
+
     public static String suggestTag(String reply, String emotion) {
         if (reply == null || reply.isEmpty()) return "";
-        if ("surprised".equals(emotion)) return "gasps";
+        String tag = "";
         if (reply.contains("吓?") || reply.contains("喂?") || reply.contains("真㗎?")
                 || reply.contains("吓？") || reply.contains("喂？") || reply.contains("真㗎？")) {
-            return "gasps";
+            tag = "gasps";
+        } else if (reply.contains("唉") || reply.contains("算啦")) {
+            tag = "sighs"; // 只有明確嘆息詞先嘆氣；「唔緊要」「唔好意思」唔算
+        } else if (("happy".equals(emotion) && (reply.contains("！") || reply.contains("!")))
+                || reply.contains("哈哈")) {
+            tag = "laughs";
+        } else if (reply.contains("等我諗下") || reply.contains("等我唞")) {
+            tag = "emm";
         }
-        if ("sad".equals(emotion)) return "sighs";
-        if (reply.contains("唉") || reply.contains("算啦") || reply.contains("唔緊要")
-                || reply.contains("唔好意思")) {
-            return "sighs";
+        if (tag.isEmpty()) return "";
+        return TAG_RND.nextInt(100) < 40 ? tag : ""; // 節制：40% 先落標籤
+    }
+
+    /** 全局限流：30 秒內用過標籤就唔准再用，保證唔會連續兩句都帶聲。 */
+    private static long lastTagAt = 0;
+
+    public static String throttleTag(String tag) {
+        long now = System.currentTimeMillis();
+        if (tag == null || tag.isEmpty()) {
+            lastTagAt = 0;
+            return "";
         }
-        if ("happy".equals(emotion) && (reply.contains("！") || reply.contains("!"))) {
-            return "laughs";
-        }
-        if (reply.contains("嗯") || reply.contains("等我諗下") || reply.contains("等我唞")) {
-            return "emm";
-        }
-        return "";
+        if (now - lastTagAt < 30_000) return ""; // 太密，放棄
+        lastTagAt = now;
+        return tag;
     }
 
     /** 校驗 emotion 喺咪白名單內，唔喺就返回空（自然）。 */
@@ -199,7 +213,7 @@ public class AiEngine {
         // 語氣按類型：批判／看守／唔重要 → 平靜；僵住 → 傷心；共情 → 自然
         String emo = "stuck".equals(type) || "worth".equals(type) ? "sad"
                 : "critic".equals(type) || "guardian".equals(type) ? "calm" : "";
-        String tag = suggestTag(reply, emo);
+        String tag = throttleTag(suggestTag(reply, emo));
         return new Response(type, reply, fallbackButtons(count), emo, tag);
     }
 
@@ -254,9 +268,9 @@ public class AiEngine {
                         + "- \"surprised\"：驚訝（好少用，得啲「喂？咁都得？」嘅位先用）\n"
                         + "- \"fluent\"：流利自然（普通敘述）\n"
                         + "- \"\"：中性自然（唔知用邊個就留空）\n"
-                        + "5. 判斷句內語氣標籤 tag（第二層，句中即時語氣）：喺「表情」位用一個——\n"
-                        + "- laughs（好笑／開心笑）、chuckle（輕笑）、sighs（嘆氣：唉…）、gasps（倒吸氣：吓？）、breath（換氣）、emm（猶豫：嗯…）\n"
-                        + "- 冇表情位就留空；唔好夾硬加；只可以揀一個，一定要係上面其中一個或者空字串。\n"
+                        + "5. 判斷句內語氣標籤 tag（第二層，句中即時語氣）——重要：呢個係「稀有調味」，十句最多一兩句先用！大部分情況留空。\n"
+                        + "- 只有真係有明顯表情嘅位先用一個：laughs（好笑）、chuckle（輕笑）、sighs（唉…嘆氣）、gasps（吓？）、breath（換氣）、emm（嗯…猶豫）\n"
+                        + "- 冇明確表情位就留空字串；唔好夾硬加；只可以揀一個，一定要係上面其中一個或者空字串。\n"
                         + "只輸出JSON：{\"type\":\"critic\",\"emotion\":\"calm\",\"tag\":\"sighs\",\"reply\":\"...\",\"buttons\":[\"...\",\"...\"]}（buttons 最少 4 個，最多 " + btnCount + " 個）";
                 String out = DeepSeekClient.chat(
                         p.getString("base_url", "https://api.deepseek.com"),
@@ -265,8 +279,8 @@ public class AiEngine {
                 String type = j.optString("type", "other");
                 String reply = j.optString("reply", "").trim();
                 String emotion = safeEmotion(j.optString("emotion", ""));
-                String tag = safeTag(j.optString("tag", ""));
-                if (tag.isEmpty()) tag = suggestTag(reply, emotion); // AI 冇俾就 App 補
+                String tag = throttleTag(safeTag(j.optString("tag", "")));
+                if (tag.isEmpty()) tag = throttleTag(suggestTag(reply, emotion)); // AI 冇俾就 App 補（都有限流）
                 List<String> buttons = null;
                 JSONArray arr = j.optJSONArray("buttons");
                 if (arr != null) {

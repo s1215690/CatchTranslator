@@ -663,7 +663,7 @@ public class FloatingService extends Service {
             final String reply = AiEngine.gratitudeReply(this, text);
             new TranslatorDb(this).insert("感恩", text, "gratitude");
             ui.post(() -> {
-                VoicePlayer.speak(this, reply, "happy", AiEngine.suggestTag(reply, "happy"));
+                VoicePlayer.speak(this, reply, "happy", AiEngine.throttleTag(AiEngine.suggestTag(reply, "happy")));
                 setStatus("🙏 已記低：「" + text + "」｜" + reply);
             });
         });
