@@ -49,11 +49,23 @@ public class DailySummary {
             c.set(Calendar.MINUTE, minute);
             c.set(Calendar.SECOND, 0);
             c.set(Calendar.MILLISECOND, 0);
-            if (Build.VERSION.SDK_INT >= 31) {
-                // setWindow 唔使 SCHEDULE_EXACT_ALARM 權限（Android 14 預設拒絕精確鬧鐘，會閃退！）
-                am.setWindow(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), 10 * 60 * 1000L, pi);
-            } else {
+            if (Build.VERSION.SDK_INT >= 31 && am.canScheduleExactAlarms()) {
+                // Android 12+ 有精確鬧鐘權限先用精確（總結準時啲）；冇權限就 setWindow 兜底
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
+            } else if (Build.VERSION.SDK_INT < 31) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
+            } else {
+                am.setWindow(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), 10 * 60 * 1000L, pi);
+            }
+        } catch (SecurityException se) {
+            // 精確鬧鐘權限被拒：用 setWindow 兜底，唔可以閃退
+            try {
+                AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+                am.setWindow(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 10 * 60 * 1000L, 10 * 60 * 1000L,
+                        PendingIntent.getBroadcast(ctx, action.hashCode(),
+                                new Intent(ctx, DailySummaryReceiver.class).setAction(action),
+                                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+            } catch (Exception ignored2) {
             }
         } catch (Exception ignored) {
             // 鬧鐘排唔到都唔可以閃退
