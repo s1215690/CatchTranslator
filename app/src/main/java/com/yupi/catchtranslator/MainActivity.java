@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -47,12 +46,12 @@ public class MainActivity extends Activity {
     private Switch swBluetoothKeepAlive;
     private TextView tvBluetoothKeepAliveStatus;
     private Switch swActiveComfort;
-    private Spinner spActiveComfortInterval;
+    private EditText etActiveComfortInterval;
+    private Button btnApplyActiveComfortInterval;
     private TextView tvActiveComfortStatus;
     private boolean refreshingActiveComfort;
     private int pendingBluetoothAction = 0;
     private static final int BLUETOOTH_ACTION_ENABLE = 1;
-    private static final int[] ACTIVE_COMFORT_INTERVAL_MINUTES = {15, 20, 25, 30};
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
@@ -107,7 +106,8 @@ public class MainActivity extends Activity {
         swBluetoothKeepAlive = findViewById(R.id.swBluetoothKeepAlive);
         tvBluetoothKeepAliveStatus = findViewById(R.id.tvBluetoothKeepAliveStatus);
         swActiveComfort = findViewById(R.id.swActiveComfort);
-        spActiveComfortInterval = findViewById(R.id.spActiveComfortInterval);
+        etActiveComfortInterval = findViewById(R.id.etActiveComfortInterval);
+        btnApplyActiveComfortInterval = findViewById(R.id.btnApplyActiveComfortInterval);
         tvActiveComfortStatus = findViewById(R.id.tvActiveComfortStatus);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
@@ -149,20 +149,13 @@ public class MainActivity extends Activity {
         esAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spEdgeStyle.setAdapter(esAdapter);
 
-        ArrayAdapter<String> activeComfortAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item,
-                new String[]{"每 15 分鐘", "每 20 分鐘", "每 25 分鐘", "每 30 分鐘"});
-        activeComfortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spActiveComfortInterval.setAdapter(activeComfortAdapter);
-
         SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
         etKey.setText(p.getString("api_key", ""));
         etModel.setText(p.getString("model", "deepseek-chat"));
         etBase.setText(p.getString("base_url", "https://api.deepseek.com"));
         etDebugToken.setText(p.getString("debug_token", ""));
         etDebugChatId.setText(p.getString("debug_chat_id", ""));
-        spActiveComfortInterval.setSelection(indexOf(ACTIVE_COMFORT_INTERVAL_MINUTES,
-                ActiveComfortService.getIntervalMinutes(this)));
+        etActiveComfortInterval.setText(String.valueOf(ActiveComfortService.getIntervalMinutes(this)));
 
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
         btnAiConfigToggle.setOnClickListener(v ->
@@ -174,21 +167,7 @@ public class MainActivity extends Activity {
         swActiveComfort.setOnCheckedChangeListener((button, checked) -> {
             if (!refreshingActiveComfort) setActiveComfort(checked);
         });
-        spActiveComfortInterval.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(AdapterView<?> parent, View view,
-                                               int position, long id) {
-                        if (!refreshingActiveComfort && position >= 0
-                                && position < ACTIVE_COMFORT_INTERVAL_MINUTES.length) {
-                            setActiveComfortInterval(ACTIVE_COMFORT_INTERVAL_MINUTES[position]);
-                        }
-                    }
-
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {
-                    }
-                });
+        btnApplyActiveComfortInterval.setOnClickListener(v -> applyActiveComfortInterval());
         btnLogToggle = findViewById(R.id.btnLogToggle);
         btnSendLog = findViewById(R.id.btnSendLog);
         tvLog = findViewById(R.id.tvLog);
@@ -694,9 +673,8 @@ public class MainActivity extends Activity {
         int minutes = ActiveComfortService.getIntervalMinutes(this);
         refreshingActiveComfort = true;
         if (swActiveComfort.isChecked() != enabled) swActiveComfort.setChecked(enabled);
-        int index = indexOf(ACTIVE_COMFORT_INTERVAL_MINUTES, minutes);
-        if (spActiveComfortInterval.getSelectedItemPosition() != index) {
-            spActiveComfortInterval.setSelection(index);
+        if (!etActiveComfortInterval.hasFocus()) {
+            etActiveComfortInterval.setText(String.valueOf(minutes));
         }
         refreshingActiveComfort = false;
         if (enabled && !ActiveComfortService.isRunning()) {
@@ -728,6 +706,24 @@ public class MainActivity extends Activity {
             startActiveComfortService(ActiveComfortService.ACTION_START);
         }
         tvActiveComfortStatus.setText("主動安慰已設定為每 " + minutes + " 分鐘");
+    }
+
+    private void applyActiveComfortInterval() {
+        String raw = etActiveComfortInterval.getText().toString().trim();
+        int minutes;
+        try {
+            minutes = Integer.parseInt(raw);
+        } catch (Exception e) {
+            Toast.makeText(this, "請輸入分鐘數（15–30）", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (minutes < ActiveComfortService.MIN_INTERVAL_MINUTES
+                || minutes > ActiveComfortService.MAX_INTERVAL_MINUTES) {
+            Toast.makeText(this, "請輸入 15–30 分鐘內的整數", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        etActiveComfortInterval.clearFocus();
+        setActiveComfortInterval(minutes);
     }
 
     private void startActiveComfortService(String action) {
@@ -814,10 +810,4 @@ public class MainActivity extends Activity {
         return 0;
     }
 
-    private static int indexOf(int[] arr, int value) {
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i] == value) return i;
-        }
-        return 0;
-    }
 }

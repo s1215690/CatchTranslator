@@ -29,9 +29,9 @@ public class ActiveComfortService extends Service {
     public static final String PREF_INTERVAL = "active_comfort_interval_minutes";
 
     private static final int NOTIFICATION_ID = 8;
-    private static final int DEFAULT_INTERVAL_MINUTES = 20;
-    private static final int MIN_INTERVAL_MINUTES = 15;
-    private static final int MAX_INTERVAL_MINUTES = 30;
+    public static final int DEFAULT_INTERVAL_MINUTES = 20;
+    public static final int MIN_INTERVAL_MINUTES = 15;
+    public static final int MAX_INTERVAL_MINUTES = 30;
     private static final long BUSY_RETRY_MS = 2 * 60 * 1000L;
 
     private static volatile boolean running;
