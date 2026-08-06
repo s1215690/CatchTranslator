@@ -15,6 +15,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
+import android.widget.Switch;
 
 import java.util.Map;
 import android.widget.Spinner;
@@ -39,7 +40,12 @@ public class MainActivity extends Activity {
     private LinearLayout llEdge;
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
     private static final String[] EDGE_STYLE_VALUES = {"friendly", "", "cheerful", "serious"};
-    private Button btnStart, btnAlarmPerm;
+    private Button btnStart, btnAlarmPerm, btnBluetoothKeepAliveTest;
+    private Switch swBluetoothKeepAlive;
+    private TextView tvBluetoothKeepAliveStatus;
+    private int pendingBluetoothAction = 0;
+    private static final int BLUETOOTH_ACTION_ENABLE = 1;
+    private static final int BLUETOOTH_ACTION_TEST = 2;
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
@@ -85,6 +91,9 @@ public class MainActivity extends Activity {
         tvStats = findViewById(R.id.tvStats);
         btnStart = findViewById(R.id.btnStart);
         btnAlarmPerm = findViewById(R.id.btnAlarmPerm);
+        swBluetoothKeepAlive = findViewById(R.id.swBluetoothKeepAlive);
+        btnBluetoothKeepAliveTest = findViewById(R.id.btnBluetoothKeepAliveTest);
+        tvBluetoothKeepAliveStatus = findViewById(R.id.tvBluetoothKeepAliveStatus);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
         rgBtnCount = findViewById(R.id.rgBtnCount);
@@ -163,6 +172,9 @@ public class MainActivity extends Activity {
         btnStart.setOnClickListener(v -> startFloating());
         findViewById(R.id.btnPerm).setOnClickListener(v -> openOverlaySettings());
         btnAlarmPerm.setOnClickListener(v -> openExactAlarmSettings());
+        swBluetoothKeepAlive.setOnCheckedChangeListener((button, checked) ->
+                setBluetoothKeepAlive(checked));
+        btnBluetoothKeepAliveTest.setOnClickListener(v -> startBluetoothKeepAliveTest());
 
         rgSize.setOnCheckedChangeListener((g, id) -> {
             String v = id == R.id.rbSizeSmall ? "small" : id == R.id.rbSizeMedium ? "medium" : "large";
@@ -235,6 +247,21 @@ public class MainActivity extends Activity {
         handleDueTimedNudge(intent);
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != 22) return;
+        int action = pendingBluetoothAction;
+        pendingBluetoothAction = 0;
+        if (grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (action == BLUETOOTH_ACTION_ENABLE) swBluetoothKeepAlive.setChecked(true);
+            else if (action == BLUETOOTH_ACTION_TEST) startBluetoothKeepAliveTest();
+        } else {
+            Toast.makeText(this, "未授予附近設備權限，無法判斷藍牙音箱連接狀態", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void refresh() {
         boolean ok = Settings.canDrawOverlays(this);
         tvStatus.setText(ok ? "懸浮權限：已開啟 ✅" : "懸浮權限：未開啟 ❌（撳下面掣去開）");
@@ -242,6 +269,7 @@ public class MainActivity extends Activity {
         boolean exact = TimedNudgeScheduler.canScheduleExact(this);
         btnAlarmPerm.setText(exact ? "準時提醒權限：已開啟 ✅" : "開啟「準時提醒」權限");
         btnAlarmPerm.setEnabled(Build.VERSION.SDK_INT >= 31 && !exact);
+        refreshBluetoothKeepAlive();
         tvRecords.setText(new TranslatorDb(this).dump());
         renderStats();
 
@@ -576,6 +604,66 @@ public class MainActivity extends Activity {
             startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.parse("package:" + getPackageName())));
         }
+    }
+
+    private void refreshBluetoothKeepAlive() {
+        SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
+        boolean enabled = p.getBoolean(BluetoothKeepAliveService.PREF_ENABLED, false);
+        if (swBluetoothKeepAlive.isChecked() != enabled) {
+            swBluetoothKeepAlive.setChecked(enabled);
+        }
+        String device = BluetoothKeepAliveService.getConnectedDeviceName(this);
+        if (!enabled) {
+            tvBluetoothKeepAliveStatus.setText("目前未啟用 · " + device);
+        } else if (device.startsWith("需要")) {
+            tvBluetoothKeepAliveStatus.setText("保活已開啟，但 " + device);
+        } else if (device.startsWith("未找到")) {
+            tvBluetoothKeepAliveStatus.setText("保活已開啟 · 等待藍牙音箱連接");
+        } else {
+            tvBluetoothKeepAliveStatus.setText("保活已開啟 · " + device + "（近乎靜音）");
+        }
+    }
+
+    private void setBluetoothKeepAlive(boolean enabled) {
+        if (!enabled) {
+            getSharedPreferences("settings", MODE_PRIVATE).edit()
+                    .putBoolean(BluetoothKeepAliveService.PREF_ENABLED, false).apply();
+            stopService(new Intent(this, BluetoothKeepAliveService.class));
+            refreshBluetoothKeepAlive();
+            return;
+        }
+        if (!ensureBluetoothPermission(BLUETOOTH_ACTION_ENABLE)) {
+            swBluetoothKeepAlive.setChecked(false);
+            return;
+        }
+        getSharedPreferences("settings", MODE_PRIVATE).edit()
+                .putBoolean(BluetoothKeepAliveService.PREF_ENABLED, true).apply();
+        startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_START);
+        Toast.makeText(this, "藍牙音箱保活已開啟（近乎靜音）", Toast.LENGTH_SHORT).show();
+        refreshBluetoothKeepAlive();
+    }
+
+    private void startBluetoothKeepAliveTest() {
+        if (!ensureBluetoothPermission(BLUETOOTH_ACTION_TEST)) return;
+        startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_TEST);
+        Toast.makeText(this, "開始測試保活 30 秒，請留意音箱會否自動關機", Toast.LENGTH_LONG).show();
+    }
+
+    private boolean ensureBluetoothPermission(int action) {
+        if (Build.VERSION.SDK_INT < 31
+                || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+        pendingBluetoothAction = action;
+        requestPermissions(new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, 22);
+        return false;
+    }
+
+    private void startBluetoothKeepAliveService(String action) {
+        Intent intent = new Intent(this, BluetoothKeepAliveService.class).setAction(action);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent);
+        else startService(intent);
     }
 
     /** 冇懸浮權限時，到點通知會帶任務返主頁；開權限後立即開始逐步推動。 */

@@ -228,6 +228,49 @@
             android:text="開啟「準時提醒」權限"
             android:textColor="#2E7D5B" />
 
+        <!-- 藍牙音箱保活 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="藍牙音箱保活"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#2E7D5B" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="用近乎聽不到的非零訊號，避免音箱因長時間無聲而自動休眠；App 語音播放時會自動讓路。"
+            android:textSize="13sp"
+            android:textColor="#7FA88F" />
+
+        <Switch
+            android:id="@+id/swBluetoothKeepAlive"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="開啟藍牙音箱保活（近乎靜音）"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnBluetoothKeepAliveTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/btn_bg"
+            android:text="測試保活 30 秒"
+            android:textColor="#2E7D5B" />
+
+        <TextView
+            android:id="@+id/tvBluetoothKeepAliveStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="13sp"
+            android:textColor="#E67E22" />
+
         <!-- 面板大小 -->
         <TextView
             android:layout_width="wrap_content"

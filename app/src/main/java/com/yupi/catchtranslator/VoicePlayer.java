@@ -6,6 +6,7 @@ import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 
 import java.io.File;
 import java.util.Locale;
@@ -22,6 +23,13 @@ public class VoicePlayer {
     private static TextToSpeech tts;
     private static boolean ttsReady = false;
     private static boolean legacyCacheCleared = false;
+    private static int activeFilePlayers = 0;
+    private static String activeTtsUtterance;
+
+    /** 供藍牙保活服務讓路：App 正在出聲時暫停保活訊號。 */
+    public static synchronized boolean isPlaybackActive() {
+        return activeFilePlayers > 0 || activeTtsUtterance != null;
+    }
 
     /** 語音引擎失敗回退系統聲時通知 UI（等用戶知道唔係設定冇用）。 */
     public interface FallbackListener {
@@ -208,12 +216,27 @@ public class VoicePlayer {
         try {
             MediaPlayer mp = new MediaPlayer();
             mp.setDataSource(f.getAbsolutePath());
-            mp.setOnPreparedListener(MediaPlayer::start);
+            final boolean[] counted = {false};
+            mp.setOnPreparedListener(m -> {
+                synchronized (VoicePlayer.class) {
+                    activeFilePlayers++;
+                    counted[0] = true;
+                }
+                m.start();
+            });
             mp.setOnCompletionListener(m -> {
+                if (counted[0]) {
+                    counted[0] = false;
+                    endFilePlayback();
+                }
                 m.release();
                 deleteQuietly(f);
             });
             mp.setOnErrorListener((m, what, extra) -> {
+                if (counted[0]) {
+                    counted[0] = false;
+                    endFilePlayback();
+                }
                 try { m.release(); } catch (Exception ignored) {}
                 deleteQuietly(f);
                 return true;
@@ -239,7 +262,16 @@ public class VoicePlayer {
                 } catch (Exception ignored) {}
                 rate = Math.max(0.5f, Math.min(2f, rate));
                 tts.setSpeechRate(rate);
-                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "yupi_" + System.currentTimeMillis());
+                String utteranceId = "yupi_" + System.currentTimeMillis();
+                synchronized (VoicePlayer.class) {
+                    activeTtsUtterance = utteranceId;
+                }
+                int result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId);
+                if (result == TextToSpeech.ERROR) {
+                    synchronized (VoicePlayer.class) {
+                        if (utteranceId.equals(activeTtsUtterance)) activeTtsUtterance = null;
+                    }
+                }
             } catch (Exception ignored) {}
         });
     }
@@ -248,6 +280,24 @@ public class VoicePlayer {
         if (tts != null) return;
         tts = new TextToSpeech(ctx.getApplicationContext(), status -> {
             if (status == TextToSpeech.SUCCESS) {
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override
+                    public void onStart(String utteranceId) {
+                        synchronized (VoicePlayer.class) {
+                            if (utteranceId.equals(activeTtsUtterance)) activeTtsUtterance = utteranceId;
+                        }
+                    }
+
+                    @Override
+                    public void onDone(String utteranceId) {
+                        endTtsPlayback(utteranceId);
+                    }
+
+                    @Override
+                    public void onError(String utteranceId) {
+                        endTtsPlayback(utteranceId);
+                    }
+                });
                 Locale[] tries = {
                         new Locale("yue", "HK"),
                         Locale.TRADITIONAL_CHINESE,
@@ -263,5 +313,15 @@ public class VoicePlayer {
                 }
             }
         });
+    }
+
+    private static synchronized void endFilePlayback() {
+        if (activeFilePlayers > 0) activeFilePlayers--;
+    }
+
+    private static synchronized void endTtsPlayback(String utteranceId) {
+        if (utteranceId != null && utteranceId.equals(activeTtsUtterance)) {
+            activeTtsUtterance = null;
+        }
     }
 }

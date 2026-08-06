@@ -20,5 +20,13 @@ public class BootReceiver extends BroadcastReceiver {
                 else ctx.startService(i);
             } catch (Exception ignored) {}
         }
+        if (p.getBoolean(BluetoothKeepAliveService.PREF_ENABLED, false)) {
+            try {
+                Intent i = new Intent(ctx, BluetoothKeepAliveService.class)
+                        .setAction(BluetoothKeepAliveService.ACTION_START);
+                if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
+                else ctx.startService(i);
+            } catch (Exception ignored) {}
+        }
     }
 }
