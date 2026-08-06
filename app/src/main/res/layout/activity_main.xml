@@ -424,6 +424,14 @@
                 android:layout_marginTop="2dp" />
 
             <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="自動模式會逐句選擇平靜、開心、傷感、堅定、害怕、厭惡、驚訝或自然流利；手動模式會固定整把聲的情感。"
+                android:textColor="#7FA88F"
+                android:textSize="12sp" />
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -439,7 +447,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="試聽語音" />
+            android:text="試聽語音／情感" />
 
         <!-- 語速 -->
         <TextView

@@ -50,7 +50,8 @@ public class VoicePlayer {
     }
 
     /**
-     * emotionOverride：AI 根據回應內容揀嘅語氣（""=自然 / calm / happy / sad / surprised / fluent），空＝用設定值。
+     * emotionOverride：AI 根據回應內容揀嘅語氣；自動模式會先採用有效 AI 情感，
+     * 再用本地內容判斷兜底。手動模式則固定使用設定值。
      * tag：句內語氣標籤（laughs/sighs/gasps/emm…，speech-2.8 專用）。Edge／系統 TTS 唔支持，會自動忽略。
      */
     public static void speak(final Context ctx, final String text, final String emotionOverride, final String tag) {
@@ -86,8 +87,10 @@ public class VoicePlayer {
             final String mmKey = p.getString("minimax_key", "");
             final String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
             final String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
-            final String mmEmotion = (emotionOverride != null && !emotionOverride.isEmpty())
-                    ? emotionOverride : p.getString("minimax_emotion", "");
+            final String mmEmotionMode = emotionMode(p);
+            final String mmEmotion = AiEngine.resolveVoiceEmotion(
+                    text, emotionOverride, mmEmotionMode);
+            DebugLog.add("TTS", "MiniMax 情感: mode=" + mmEmotionMode + " | resolved=" + mmEmotion);
             POOL.execute(() -> {
                 String finalText = MiniMaxTts.applyTag(text, tag);
                 File out = null;
@@ -132,8 +135,9 @@ public class VoicePlayer {
         try {
             String mmVoice = p.getString("minimax_voice", MiniMaxTts.VOICE_IDS[0]);
             String mmModel = p.getString("minimax_model", MiniMaxTts.MODEL_IDS[0]);
-            String mmEmotion = (emotion != null && !emotion.isEmpty())
-                    ? emotion : p.getString("minimax_emotion", "");
+            String mmEmotionMode = emotionMode(p);
+            String mmEmotion = AiEngine.resolveVoiceEmotion(text, emotion, mmEmotionMode);
+            DebugLog.add("TTS", "回退 MiniMax 情感: mode=" + mmEmotionMode + " | resolved=" + mmEmotion);
             String finalText = MiniMaxTts.applyTag(text, tag);
             out = freshAudioFile(ctx);
             DebugLog.add("TTS", "回退重新合成中（MiniMax）: " + truncate(finalText, 50));
@@ -147,6 +151,15 @@ public class VoicePlayer {
             DebugLog.add("TTS", "回退 MiniMax 失敗: " + truncate(e2.getMessage(), 100));
             return false;
         }
+    }
+
+    /** 舊版冇 mode key：舊值為空代表原本預設，升級為 auto；非空手動選擇照舊保留。 */
+    private static String emotionMode(SharedPreferences p) {
+        if (p.contains("minimax_emotion_mode")) {
+            return p.getString("minimax_emotion_mode", "auto");
+        }
+        String legacy = p.getString("minimax_emotion", "");
+        return legacy == null || legacy.isEmpty() ? "auto" : legacy;
     }
 
     private static String truncate(String s, int n) {

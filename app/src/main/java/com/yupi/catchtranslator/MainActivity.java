@@ -50,6 +50,24 @@ public class MainActivity extends Activity {
     private final List<String> miniMaxVoiceIds = new ArrayList<>();
     private final List<String> miniMaxVoiceLabels = new ArrayList<>();
     private ArrayAdapter<String> miniMaxVoiceAdapter;
+    private int emotionDemoIndex = 0;
+
+    private static final String[] EMOTION_DEMO_IDS = {
+            "calm", "happy", "sad", "angry", "fearful", "disgusted", "surprised", "fluent"
+    };
+    private static final String[] EMOTION_DEMO_LABELS = {
+            "平靜", "開心", "傷感", "堅定保護", "害怕", "厭惡", "驚訝", "自然敘述"
+    };
+    private static final String[] EMOTION_DEMO_TEXTS = {
+            "唔使心急，我喺度陪住你，慢慢講就得。",
+            "好嘢！你做得到，今次真係值得替自己開心！",
+            "我知道你已經好攰、好辛苦，唔需要再硬撐。",
+            "夠喇，翻譯官唔准再搶咪，呢句根本唔代表你。",
+            "我知道你而家好驚，心口好實，但你唔係一個人。",
+            "呢種剝奪你快樂嘅做法真係好離譜，唔值得你再跟。",
+            "吓？原來你已經行咗咁遠，連自己都未發現！",
+            "而家我哋先停一停，再慢慢睇清楚發生緊乜。"
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -172,7 +190,14 @@ public class MainActivity extends Activity {
                         .edit().putBoolean("thinking_enabled", checked).apply());
         findViewById(R.id.btnVoiceTest).setOnClickListener(v -> {
             save(); // 先儲存再試聽，唔使怕漏撳儲存掣
-            VoicePlayer.speak(this, "你好，我係 YupiSaver。今日想試下呢把聲得唔得。");
+            if (rgVoice.getCheckedRadioButtonId() == R.id.rbVoiceMiniMax
+                    && "auto".equals(selectedMiniMaxEmotionMode())) {
+                int i = emotionDemoIndex++ % EMOTION_DEMO_IDS.length;
+                Toast.makeText(this, "自動情感試聽：" + EMOTION_DEMO_LABELS[i], Toast.LENGTH_SHORT).show();
+                VoicePlayer.speak(this, EMOTION_DEMO_TEXTS[i], EMOTION_DEMO_IDS[i], null);
+            } else {
+                VoicePlayer.speak(this, "你好，我係 YupiSaver。今日想試下呢把聲得唔得。");
+            }
         });
         rgSpeed.setOnCheckedChangeListener((g, id) -> {
             String v = id == R.id.rbSpeedSlow ? "-10"
@@ -238,7 +263,10 @@ public class MainActivity extends Activity {
         }
         spMiniMaxModel.setSelection(mmModelPos);
         int mmEmoPos = 0;
-        String mmEmo = p.getString("minimax_emotion", "");
+        String mmEmo = p.contains("minimax_emotion_mode")
+                ? p.getString("minimax_emotion_mode", "auto")
+                : (p.getString("minimax_emotion", "").isEmpty()
+                ? "auto" : p.getString("minimax_emotion", ""));
         for (int i = 0; i < MiniMaxTts.EMOTION_IDS.length; i++) {
             if (MiniMaxTts.EMOTION_IDS[i].equals(mmEmo)) { mmEmoPos = i; break; }
         }
@@ -289,8 +317,8 @@ public class MainActivity extends Activity {
                         selectedMiniMaxVoiceId())
                 .putString("minimax_model",
                         MiniMaxTts.MODEL_IDS[Math.max(0, spMiniMaxModel.getSelectedItemPosition())])
-                .putString("minimax_emotion",
-                        MiniMaxTts.EMOTION_IDS[Math.max(0, spMiniMaxEmotion.getSelectedItemPosition())])
+                .putString("minimax_emotion_mode", selectedMiniMaxEmotionMode())
+                .putString("minimax_emotion", legacyMiniMaxEmotionValue())
                 .putString("edge_voice",
                         EDGE_VOICE_VALUES[Math.max(0, spEdgeVoice.getSelectedItemPosition())])
                 .putString("edge_style",
@@ -307,6 +335,20 @@ public class MainActivity extends Activity {
             return miniMaxVoiceIds.get(position);
         }
         return MiniMaxTts.VOICE_IDS[0];
+    }
+
+    private String selectedMiniMaxEmotionMode() {
+        int position = spMiniMaxEmotion.getSelectedItemPosition();
+        if (position >= 0 && position < MiniMaxTts.EMOTION_IDS.length) {
+            return MiniMaxTts.EMOTION_IDS[position];
+        }
+        return "auto";
+    }
+
+    /** 保留舊 key 兼容其他已安裝版本；auto 對舊版等同自然。 */
+    private String legacyMiniMaxEmotionValue() {
+        String mode = selectedMiniMaxEmotionMode();
+        return "auto".equals(mode) ? "" : mode;
     }
 
     private void reloadMiniMaxVoices(SharedPreferences p) {
@@ -390,7 +432,8 @@ public class MainActivity extends Activity {
         btnDesignVoice.setEnabled(false);
         tvVoiceDesignStatus.setText("正在設計聲線，通常需要十幾秒…");
         final String model = MiniMaxTts.MODEL_IDS[Math.max(0, spMiniMaxModel.getSelectedItemPosition())];
-        final String emotion = MiniMaxTts.EMOTION_IDS[Math.max(0, spMiniMaxEmotion.getSelectedItemPosition())];
+        final String emotion = AiEngine.resolveVoiceEmotion(
+                sample, null, selectedMiniMaxEmotionMode());
         final String rate = getSharedPreferences("settings", MODE_PRIVATE)
                 .getString("voice_rate", "0");
 

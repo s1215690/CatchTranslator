@@ -27,7 +27,7 @@ public class AiEngine {
         public final String type;          // critic / guardian / stuck / feeling / worth / other
         public final String reply;         // 30-60 字回應
         public final List<String> buttons; // 4 個新按鈕；null = 唔換按鈕
-        public final String emotion;       // 段落語氣：""=自然 / calm / happy / sad / surprised / fluent
+        public final String emotion;       // 段落語氣：七種核心情緒 / fluent / ""=自然
         public final String tag;           // 句內語氣標籤："" / laughs / sighs / gasps / emm…(speech-2.8 專用)
         public Response(String type, String reply, List<String> buttons) {
             this(type, reply, buttons, "", "");
@@ -44,8 +44,10 @@ public class AiEngine {
         }
     }
 
-    /** 段落語氣白名單（MiniMax 實測支持；whisper 報 2013 所以唔用）。 */
-    public static final String[] EMOTIONS = {"", "calm", "happy", "sad", "surprised", "fluent"};
+    /** MiniMax Speech 2.8 情感白名單；whisper 曾回報 2013，所以唔放入自動模式。 */
+    public static final String[] EMOTIONS = {
+            "", "calm", "happy", "sad", "angry", "fearful", "disgusted", "surprised", "fluent"
+    };
 
     /** 句內語氣標籤白名單（speech-2.8 專用；其他引擎會忽略）。 */
     public static final String[] TAGS = {"", "laughs", "chuckle", "sighs", "gasps", "breath", "emm"};
@@ -115,8 +117,8 @@ public class AiEngine {
     }
 
     /**
-     * emotion 都要同內容夾：AI 亂揀 sad/happy 會搞到成段語氣唔夾（sad 聽落似嘆氣）。
-     * sad 一定要句中有喪氣字眼；happy 要有開心字眼；surprised 要有疑問。唔夾就降返自然。
+     * emotion 都要同內容夾：各種強情緒一定要有句子內容支持。
+     * 唔夾就降返自然，避免無緣無故嬲／驚／傷心。
      */
     public static String emotionForContent(String reply, String aiEmotion) {
         String e = safeEmotion(aiEmotion);
@@ -125,15 +127,66 @@ public class AiEngine {
             case "sad":
                 return (reply.contains("攰") || reply.contains("痛") || reply.contains("唉")
                         || reply.contains("算啦") || reply.contains("冇力") || reply.contains("唔想")
-                        || reply.contains("灰") || reply.contains("頹") || reply.contains("麻木")) ? e : "";
+                        || reply.contains("灰") || reply.contains("頹") || reply.contains("麻木")
+                        || reply.contains("辛苦") || reply.contains("難受") || reply.contains("寂寞")) ? e : "";
             case "happy":
                 return (reply.contains("！") || reply.contains("!")
                         || reply.contains("開心") || reply.contains("好嘢") || reply.contains("正")) ? e : "";
+            case "angry":
+                return (reply.contains("翻譯官") || reply.contains("破壞者")
+                        || reply.contains("搶咪") || reply.contains("搶走") || reply.contains("剝奪")
+                        || reply.contains("唔係你") || reply.contains("唔代表你")
+                        || reply.contains("夠喇") || reply.contains("唔准") || reply.contains("過分")) ? e : "";
+            case "fearful":
+                return (reply.contains("驚") || reply.contains("怕") || reply.contains("危險")
+                        || reply.contains("唔安全") || reply.contains("心口實")
+                        || reply.contains("緊張") || reply.contains("縮")) ? e : "";
+            case "disgusted":
+                return (reply.contains("討厭") || reply.contains("厭惡") || reply.contains("噁心")
+                        || reply.contains("反感") || reply.contains("離譜")) ? e : "";
             case "surprised":
-                return (reply.contains("？") || reply.contains("?")) ? e : "";
+                return (reply.contains("？") || reply.contains("?") || reply.contains("吓")
+                        || reply.contains("竟然") || reply.contains("原來")) ? e : "";
             default:
                 return e; // calm / fluent / 空 唔使校
         }
+    }
+
+    /**
+     * 自動情感總入口：AI 有提供而且內容吻合就採用；否則由 App 按句子內容兜底。
+     * mode 唔係 auto 時視為手動固定模式，AI 唔會覆蓋用戶選擇。
+     */
+    public static String resolveVoiceEmotion(String text, String aiEmotion, String mode) {
+        String selected = mode == null ? "auto" : mode.trim();
+        if (!"auto".equals(selected)) return safeEmotion(selected);
+        String fromAi = emotionForContent(text, aiEmotion);
+        return fromAi == null || fromAi.isEmpty() ? inferEmotion(text) : fromAi;
+    }
+
+    /** 冇 AI emotion 時，以明確關鍵詞判斷；寧願自然流利，唔會隨機亂變情緒。 */
+    public static String inferEmotion(String text) {
+        if (text == null || text.trim().isEmpty()) return "";
+        String t = text.trim();
+        if (containsAny(t, "討厭", "厭惡", "噁心", "反感", "離譜")) return "disgusted";
+        if (containsAny(t, "驚", "害怕", "怕", "危險", "唔安全", "心口實", "緊張")) return "fearful";
+        if (containsAny(t, "攰", "痛", "灰", "頹", "麻木", "冇力", "辛苦", "難受", "寂寞")) return "sad";
+        if (containsAny(t, "翻譯官", "破壞者", "搶咪", "搶走", "剝奪", "唔代表你",
+                "唔係你", "夠喇", "唔准", "過分")) return "angry";
+        if (containsAny(t, "好嘢", "做到", "贏", "成功", "開心", "恭喜", "里程碑",
+                "話到做到", "多謝", "值得", "正呀")) return "happy";
+        if (containsAny(t, "吓", "竟然", "原來", "真㗎") || t.contains("？") || t.contains("?")) {
+            return "surprised";
+        }
+        if (containsAny(t, "慢慢", "唔使心急", "陪住你", "唞下", "呼吸", "唔緊要",
+                "冇問題", "安心", "溫柔")) return "calm";
+        return "fluent";
+    }
+
+    private static boolean containsAny(String text, String... words) {
+        for (String word : words) {
+            if (text.contains(word)) return true;
+        }
+        return false;
     }
 
     /** 校驗 emotion 喺咪白名單內，唔喺就返回空（自然）。 */
@@ -257,9 +310,10 @@ public class AiEngine {
         }
         String reply = pool[Math.abs(new Random().nextInt()) % pool.length];
         if (narration) reply = toNarration(reply);
-        // 語氣按類型：批判／看守／唔重要 → 平靜；僵住 → 傷心；共情 → 自然
+        // 本地 fallback 都有情感變化：批判用保護性堅定、看守平靜、僵住／自我價值傷感。
         String emo = "stuck".equals(type) || "worth".equals(type) ? "sad"
-                : "critic".equals(type) || "guardian".equals(type) ? "calm" : "";
+                : "critic".equals(type) ? "angry"
+                : "guardian".equals(type) ? "calm" : inferEmotion(reply);
         String tag = throttleTag(suggestTag(reply, emo));
         return new Response(type, reply, fallbackButtons(count), emo, tag);
     }
@@ -312,9 +366,13 @@ public class AiEngine {
                         + "- \"calm\"：平靜、抽離、專業（指認翻譯官、安慰、沉重嘅嘢）\n"
                         + "- \"sad\"：傷心、柔軟——極少用！只有佢明言好攰／好痛／好灰嗰陣先用；普通安慰唔係 sad（聽落會似嘆氣）\n"
                         + "- \"happy\"：開朗、輕快（鼓勵、微小勝利、輕鬆嘅嘢）\n"
+                        + "- \"angry\"：保護性、堅定、有力量（駁翻譯官／破壞者；唔可以對用戶發火）\n"
+                        + "- \"fearful\"：緊張、害怕（只在句子本身描述驚／不安全時輕量使用）\n"
+                        + "- \"disgusted\"：厭惡、反感（極少用，只限明確厭惡／離譜內容，唔可以針對用戶）\n"
                         + "- \"surprised\"：驚訝（好少用，得啲「喂？咁都得？」嘅位先用）\n"
                         + "- \"fluent\"：流利自然（普通敘述）\n"
                         + "- \"\"：中性自然（唔知用邊個就留空）\n"
+                        + "唔好每次都揀 calm；按 reply 真正語氣揀最貼切一種，但強情緒一定要有內容依據。\n"
                         + "5. 判斷句內語氣標籤 tag（第二層，句中即時語氣）——重要：呢個係「稀有調味」，十句最多一兩句先用！大部分情況留空。\n"
                         + "- 只有真係有明顯表情嘅位先用一個：laughs（好笑）、chuckle（輕笑）、sighs（唉…嘆氣）、gasps（吓？）、breath（換氣）、emm（嗯…猶豫）\n"
                         + "- 冇明確表情位就留空字串；唔好夾硬加；只可以揀一個，一定要係上面其中一個或者空字串。\n"
@@ -390,7 +448,7 @@ public class AiEngine {
                         + "2. 角度可以輪住嚟：抽離指認 → 身體錨點 → 陪伴比喻 → 收窄落地；越講越貼身、越溫柔。\n"
                         + "3. 用廣東話寫30-60字。\n"
                         + "4. 唔好問問題、唔好用「你應該」「你必須」、唔好以「收到」「OK」開頭、唔好做應答式確認。\n"
-                        + "5. emotion：普通安慰用「calm」或「」（自然）；只有佢明言好攰好痛先至用「sad」（好少用，聽落會似嘆氣）。\n"
+                        + "5. emotion：按今次 reply 揀 calm／sad／happy／angry／fearful／disgusted／surprised／fluent／空字串；普通安慰多數 calm 或 fluent，強情緒一定要同內容吻合，唔好永遠同一種。\n"
                         + "6. tag 係稀有調味：冇明確表情位就留空；sighs 要句入面有「唉／算啦」先可以用。\n"
                         + "只輸出JSON：{\"emotion\":\"calm\",\"tag\":\"\",\"reply\":\"...\"}";
                 String out = DeepSeekClient.chat(

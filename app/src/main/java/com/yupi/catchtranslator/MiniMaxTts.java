@@ -43,9 +43,18 @@ public class MiniMaxTts {
             "2.8 HD（推薦·最自然）", "2.8 Turbo（快·慳）"
     };
 
-    /** 語氣（voice_setting.emotion），空＝唔傳（自然）。實測：speech-2.8 支持 calm/happy/sad/surprised/fluent；whisper 唔支持（報 2013）。 */
-    public static final String[] EMOTION_IDS = {"", "calm", "happy", "sad", "surprised", "fluent"};
-    public static final String[] EMOTION_LABELS = {"自然（預設）", "平靜", "開心", "傷心·安慰", "驚訝", "流利自然"};
+    /**
+     * 情感模式。auto 只係 App 端模式，送去 MiniMax 前會按內容轉成實際 emotion；
+     * 空字串代表固定自然、不傳 emotion。speech-2.8 支持七種核心情緒，另有 fluent。
+     */
+    public static final String[] EMOTION_IDS = {
+            "auto", "", "calm", "happy", "sad", "angry", "fearful", "disgusted", "surprised", "fluent"
+    };
+    public static final String[] EMOTION_LABELS = {
+            "自動 · 跟隨內容（推薦）", "自然 · 不固定情緒", "平靜 · 溫柔",
+            "開心 · 輕快", "傷感 · 柔和", "堅定 · 生氣", "緊張 · 害怕",
+            "厭惡 · 反感", "驚訝 · 意外", "流利 · 敘述"
+    };
 
     /** 句內語氣標籤白名單（speech-2.8 專用，插喺 text 入面做即時語氣切換）。 */
     public static final String[] TAG_IDS = {"", "laughs", "chuckle", "sighs", "gasps", "breath", "emm"};
@@ -71,7 +80,9 @@ public class MiniMaxTts {
         vs.put("speed", speed);
         vs.put("vol", 1.0);
         vs.put("pitch", 0);
-        if (emotion != null && !emotion.trim().isEmpty()) vs.put("emotion", emotion.trim());
+        if (emotion != null && !emotion.trim().isEmpty() && !"auto".equals(emotion.trim())) {
+            vs.put("emotion", emotion.trim());
+        }
         body.put("voice_setting", vs);
 
         JSONObject as = new JSONObject();
