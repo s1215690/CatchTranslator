@@ -251,17 +251,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+            android:checked="true"
             android:text="開啟藍牙音箱保活（近乎靜音）"
             android:textSize="14sp" />
-
-        <Button
-            android:id="@+id/btnBluetoothKeepAliveTest"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:background="@drawable/btn_bg"
-            android:text="測試保活 30 秒"
-            android:textColor="#2E7D5B" />
 
         <TextView
             android:id="@+id/tvBluetoothKeepAliveStatus"

@@ -15,11 +15,14 @@ import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
 import android.media.AudioManager;
+import android.media.AudioPlaybackConfiguration;
 import android.media.AudioTrack;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+
+import java.util.List;
 
 /**
  * 以接近聽不到的非零高頻訊號保持 A2DP 音箱唔因為長時間無聲而休眠。
@@ -30,7 +33,6 @@ public class BluetoothKeepAliveService extends Service {
     public static final String CHANNEL_ID = "bluetooth_keep_alive";
     public static final String ACTION_START = "com.yupi.catchtranslator.START_BT_KEEP_ALIVE";
     public static final String ACTION_STOP = "com.yupi.catchtranslator.STOP_BT_KEEP_ALIVE";
-    public static final String ACTION_TEST = "com.yupi.catchtranslator.TEST_BT_KEEP_ALIVE";
     public static final String PREF_ENABLED = "bluetooth_keepalive_enabled";
 
     private static final int NOTIFICATION_ID = 7;
@@ -38,7 +40,6 @@ public class BluetoothKeepAliveService extends Service {
     private static final int CHANNEL_MASK = AudioFormat.CHANNEL_OUT_STEREO;
     private static final int SIGNAL_FRAMES = SAMPLE_RATE / 5; // 200 ms；19 kHz 下剛好完整週期
     private static final long MONITOR_INTERVAL_MS = 2_000L;
-    private static final long TEST_DURATION_MS = 30_000L;
     private static final double SIGNAL_FREQUENCY = 19_000.0;
     private static final double SIGNAL_AMPLITUDE = 800.0 / 32767.0;
     private static final float TRACK_VOLUME = 0.03f;
@@ -49,8 +50,6 @@ public class BluetoothKeepAliveService extends Service {
     private AudioDeviceInfo currentDevice;
     private Thread audioThread;
     private volatile boolean audioLoopRunning;
-    private long testUntil;
-    private boolean temporaryTest;
     private String lastStatus = "";
 
     private final Runnable monitor = new Runnable() {
@@ -73,6 +72,14 @@ public class BluetoothKeepAliveService extends Service {
         }
     };
 
+    private final AudioManager.AudioPlaybackCallback playbackCallback =
+            new AudioManager.AudioPlaybackCallback() {
+                @Override
+                public void onPlaybackConfigChanged(List<AudioPlaybackConfiguration> configs) {
+                    refreshKeepAlive();
+                }
+            };
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -80,6 +87,9 @@ public class BluetoothKeepAliveService extends Service {
         createChannel();
         if (Build.VERSION.SDK_INT >= 23 && audioManager != null) {
             audioManager.registerAudioDeviceCallback(deviceCallback, handler);
+        }
+        if (audioManager != null) {
+            audioManager.registerAudioPlaybackCallback(playbackCallback, handler);
         }
         startForegroundCompat();
     }
@@ -90,13 +100,6 @@ public class BluetoothKeepAliveService extends Service {
         if (ACTION_STOP.equals(action)) {
             stopSelfSafely();
             return START_NOT_STICKY;
-        }
-        if (ACTION_TEST.equals(action)) {
-            testUntil = System.currentTimeMillis() + TEST_DURATION_MS;
-            temporaryTest = !isEnabled(this);
-        } else if (ACTION_START.equals(action)) {
-            temporaryTest = false;
-            testUntil = 0L;
         }
         handler.removeCallbacks(monitor);
         handler.post(monitor);
@@ -110,6 +113,9 @@ public class BluetoothKeepAliveService extends Service {
         if (Build.VERSION.SDK_INT >= 23 && audioManager != null) {
             try { audioManager.unregisterAudioDeviceCallback(deviceCallback); } catch (Exception ignored) {}
         }
+        if (audioManager != null) {
+            try { audioManager.unregisterAudioPlaybackCallback(playbackCallback); } catch (Exception ignored) {}
+        }
         super.onDestroy();
     }
 
@@ -120,7 +126,7 @@ public class BluetoothKeepAliveService extends Service {
 
     public static boolean isEnabled(Context context) {
         return context.getSharedPreferences("settings", MODE_PRIVATE)
-                .getBoolean(PREF_ENABLED, false);
+                .getBoolean(PREF_ENABLED, true);
     }
 
     /** 主頁顯示目前是否有 A2DP 藍牙輸出，唔會主動掃描附近設備。 */
@@ -151,8 +157,7 @@ public class BluetoothKeepAliveService extends Service {
     }
 
     private boolean shouldRemainAlive() {
-        if (isEnabled(this)) return true;
-        return temporaryTest && testUntil > System.currentTimeMillis();
+        return isEnabled(this);
     }
 
     private void refreshKeepAlive() {
@@ -161,18 +166,15 @@ public class BluetoothKeepAliveService extends Service {
             stopSelfSafely();
             return;
         }
-        if (temporaryTest && testUntil <= System.currentTimeMillis()) {
-            temporaryTest = false;
-            stopAudio();
-            if (!isEnabled(this)) {
-                stopSelfSafely();
-                return;
-            }
-        }
-
         if (VoicePlayer.isPlaybackActive()) {
             stopAudio();
             updateStatus("語音播放中，暫停保活");
+            return;
+        }
+
+        if (hasExternalPlayback()) {
+            stopAudio();
+            updateStatus("偵測到其他音樂，暫停保活");
             return;
         }
 
@@ -186,6 +188,22 @@ public class BluetoothKeepAliveService extends Service {
             startAudio(device);
         }
         updateStatus("保活中 · " + deviceName(device) + "（近乎靜音）");
+    }
+
+    /**
+     * 自己的保活 AudioTrack 會佔一個播放配置；多出來的配置通常就是其他 App 的音樂。
+     * 因此不搶 Audio Focus，只在偵測到外部播放時停下，音樂停止後由 monitor 自動恢復。
+     */
+    private boolean hasExternalPlayback() {
+        if (audioManager == null) return false;
+        try {
+            List<AudioPlaybackConfiguration> configs =
+                    audioManager.getActivePlaybackConfigurations();
+            if (configs == null || configs.isEmpty()) return false;
+            return audioTrack == null ? true : configs.size() > 1;
+        } catch (SecurityException ignored) {
+            return false;
+        }
     }
 
     private void startAudio(AudioDeviceInfo device) {

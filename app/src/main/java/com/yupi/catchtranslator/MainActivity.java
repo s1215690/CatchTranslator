@@ -40,12 +40,11 @@ public class MainActivity extends Activity {
     private LinearLayout llEdge;
     private static final String[] EDGE_VOICE_VALUES = {"hk-f", "hk-m", "cn"};
     private static final String[] EDGE_STYLE_VALUES = {"friendly", "", "cheerful", "serious"};
-    private Button btnStart, btnAlarmPerm, btnBluetoothKeepAliveTest;
+    private Button btnStart, btnAlarmPerm;
     private Switch swBluetoothKeepAlive;
     private TextView tvBluetoothKeepAliveStatus;
     private int pendingBluetoothAction = 0;
     private static final int BLUETOOTH_ACTION_ENABLE = 1;
-    private static final int BLUETOOTH_ACTION_TEST = 2;
     private RadioGroup rgSize, rgVoice, rgSpeed, rgBtnCount;
     private CheckBox cbSummary, cbNarration, cbThinking;
     private EditText etMiniMaxKey;
@@ -92,7 +91,6 @@ public class MainActivity extends Activity {
         btnStart = findViewById(R.id.btnStart);
         btnAlarmPerm = findViewById(R.id.btnAlarmPerm);
         swBluetoothKeepAlive = findViewById(R.id.swBluetoothKeepAlive);
-        btnBluetoothKeepAliveTest = findViewById(R.id.btnBluetoothKeepAliveTest);
         tvBluetoothKeepAliveStatus = findViewById(R.id.tvBluetoothKeepAliveStatus);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
@@ -174,7 +172,6 @@ public class MainActivity extends Activity {
         btnAlarmPerm.setOnClickListener(v -> openExactAlarmSettings());
         swBluetoothKeepAlive.setOnCheckedChangeListener((button, checked) ->
                 setBluetoothKeepAlive(checked));
-        btnBluetoothKeepAliveTest.setOnClickListener(v -> startBluetoothKeepAliveTest());
 
         rgSize.setOnCheckedChangeListener((g, id) -> {
             String v = id == R.id.rbSizeSmall ? "small" : id == R.id.rbSizeMedium ? "medium" : "large";
@@ -227,7 +224,12 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33) {
             requestPermissions(new String[]{
                     android.Manifest.permission.POST_NOTIFICATIONS,
-                    android.Manifest.permission.RECORD_AUDIO}, 1);
+                    android.Manifest.permission.RECORD_AUDIO,
+                    android.Manifest.permission.BLUETOOTH_CONNECT}, 1);
+        } else if (Build.VERSION.SDK_INT >= 31) {
+            requestPermissions(new String[]{
+                    android.Manifest.permission.RECORD_AUDIO,
+                    android.Manifest.permission.BLUETOOTH_CONNECT}, 1);
         } else if (Build.VERSION.SDK_INT >= 23) {
             requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 1);
         }
@@ -250,13 +252,19 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (BluetoothKeepAliveService.isEnabled(this) && hasBluetoothPermission()) {
+                startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_START);
+            }
+            refresh();
+            return;
+        }
         if (requestCode != 22) return;
         int action = pendingBluetoothAction;
         pendingBluetoothAction = 0;
         if (grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             if (action == BLUETOOTH_ACTION_ENABLE) swBluetoothKeepAlive.setChecked(true);
-            else if (action == BLUETOOTH_ACTION_TEST) startBluetoothKeepAliveTest();
         } else {
             Toast.makeText(this, "未授予附近設備權限，無法判斷藍牙音箱連接狀態", Toast.LENGTH_LONG).show();
         }
@@ -608,9 +616,12 @@ public class MainActivity extends Activity {
 
     private void refreshBluetoothKeepAlive() {
         SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
-        boolean enabled = p.getBoolean(BluetoothKeepAliveService.PREF_ENABLED, false);
+        boolean enabled = p.getBoolean(BluetoothKeepAliveService.PREF_ENABLED, true);
         if (swBluetoothKeepAlive.isChecked() != enabled) {
             swBluetoothKeepAlive.setChecked(enabled);
+        }
+        if (enabled && hasBluetoothPermission()) {
+            startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_START);
         }
         String device = BluetoothKeepAliveService.getConnectedDeviceName(this);
         if (!enabled) {
@@ -643,12 +654,6 @@ public class MainActivity extends Activity {
         refreshBluetoothKeepAlive();
     }
 
-    private void startBluetoothKeepAliveTest() {
-        if (!ensureBluetoothPermission(BLUETOOTH_ACTION_TEST)) return;
-        startBluetoothKeepAliveService(BluetoothKeepAliveService.ACTION_TEST);
-        Toast.makeText(this, "開始測試保活 30 秒，請留意音箱會否自動關機", Toast.LENGTH_LONG).show();
-    }
-
     private boolean ensureBluetoothPermission(int action) {
         if (Build.VERSION.SDK_INT < 31
                 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
@@ -658,6 +663,12 @@ public class MainActivity extends Activity {
         pendingBluetoothAction = action;
         requestPermissions(new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, 22);
         return false;
+    }
+
+    private boolean hasBluetoothPermission() {
+        return Build.VERSION.SDK_INT < 31
+                || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
     }
 
     private void startBluetoothKeepAliveService(String action) {
