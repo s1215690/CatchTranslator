@@ -564,6 +564,10 @@ public class FloatingService extends Service {
             return;
         }
         setStatus("💛 諗緊再安慰你…");
+        // 即時語音反饋：唔使等 AI（思考模式要等），先應一聲，生成完再讀正式回應
+        VoicePlayer.speak(this, pick(new String[]{
+                "好，我哋繼續傾。", "嗯，我陪住你。", "我哋再傾深啲。", "好，跟住落去。"
+        }));
         pool.execute(() -> {
             java.util.List<String> hist = new java.util.ArrayList<>(lastReplies);
             if (hist.size() > 3) hist = new java.util.ArrayList<>(hist.subList(hist.size() - 3, hist.size()));
