@@ -781,6 +781,16 @@ public class FloatingService extends Service {
     private void onGratitudeTap() {
         pendingTimedNudge = false;
         pendingNudge = false;
+        String text = inputBox != null ? inputBox.getText().toString().trim() : "";
+        if (!text.isEmpty()) {
+            inputBox.setText("");
+            pendingGratitude = false;
+            lastTopic = text;
+            lastReplies.clear();
+            feedbackOk();
+            handleGratitude(text);
+            return;
+        }
         pendingGratitude = true;
         setStatus("🙏 諗緊點引導你…");
         pool.execute(() -> {
