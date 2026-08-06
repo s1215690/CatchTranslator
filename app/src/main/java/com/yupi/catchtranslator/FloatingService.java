@@ -80,6 +80,11 @@ public class FloatingService extends Service {
     private boolean pendingGratitude = false;
     private LinearLayout llFollowup;
     private Button btnFollow1, btnFollow2;
+    private Button btnMoreComfort;
+
+    // 「再安慰多啲」主題狀態：新捕捉／新輸入先會重置
+    private String lastTopic = "";
+    private final java.util.List<String> lastReplies = new java.util.ArrayList<>();
 
     private float downX, downY, rawX, rawY;
     private boolean dragging = false;
@@ -350,9 +355,11 @@ public class FloatingService extends Service {
         }
         nudgeBtn.setOnClickListener(v -> onNudgeTap());
         btnGratitude.setOnClickListener(v -> onGratitudeTap());
+        if (btnMoreComfort != null) btnMoreComfort.setOnClickListener(v -> continueComfort());
         llFollowup = panel.findViewById(R.id.llFollowup);
         btnFollow1 = panel.findViewById(R.id.btnFollow1);
         btnFollow2 = panel.findViewById(R.id.btnFollow2);
+        btnMoreComfort = panel.findViewById(R.id.btnMoreComfort);
         hideFollowup();
         String base = counterLine() + (todayHint() != null
                 ? "今日建議：「" + todayHint() + "」——撳🚀開始"
@@ -419,6 +426,9 @@ public class FloatingService extends Service {
     // ---------- 捕捉記錄 ----------
 
     private void record(final String text, final String source) {
+        // 新捕捉／新輸入＝新主題；「再安慰」唔經呢度，所以唔會重置
+        lastTopic = text;
+        lastReplies.clear();
         if (pendingGratitude && !source.equals("button")) {
             pendingGratitude = false;
             handleGratitude(text);
@@ -441,6 +451,8 @@ public class FloatingService extends Service {
                 final AiEngine.Response r = AiEngine.respond(this, text);
                 ui.post(() -> {
                     VoicePlayer.speak(this, r.reply, r.emotion, r.tag);
+                    lastReplies.add(r.reply);
+                    if (lastReplies.size() > 6) lastReplies.remove(0);
                     setStatus(counterLine() + "「" + text + "」｜" + r.reply);
                     applyButtons(r.buttons);
                     showFollowup(r.type, text);
@@ -461,6 +473,8 @@ public class FloatingService extends Service {
                 checkMilestone();
                 ui.post(() -> {
                     VoicePlayer.speak(this, r.reply, r.emotion, r.tag);
+                    lastReplies.add(r.reply);
+                    if (lastReplies.size() > 6) lastReplies.remove(0);
                     setStatus(counterLine() + "已記低（" + ch + "）：「" + text + "」｜" + r.reply);
                     applyButtons(r.buttons);
                     showFollowup(r.type, text);
@@ -511,7 +525,7 @@ public class FloatingService extends Service {
 
     private void showFollowup(final String type, final String buttonText) {
         if (llFollowup == null) return;
-        if ("critic".equals(type)) {
+        if (btnMoreComfort != null) btnMoreComfort.setVisibility(View.VISIBLE);        if ("critic".equals(type)) {
             btnFollow1.setText("🔨 駁返佢");
             btnFollow2.setText("📋 記低就算");
             btnFollow1.setOnClickListener(v -> counterArgument(buttonText));
@@ -540,6 +554,27 @@ public class FloatingService extends Service {
 
     private void hideFollowup() {
         if (llFollowup != null) llFollowup.setVisibility(View.GONE);
+        if (btnMoreComfort != null) btnMoreComfort.setVisibility(View.GONE);
+    }
+
+    /** 💛 再安慰多啲：同一主題繼續生成，唔換按鈕、唔換主題；直到撳咗其他掣或者發咗新嘢。 */
+    private void continueComfort() {
+        if (lastTopic.isEmpty()) {
+            setStatus("未有主題——先捕捉一句先");
+            return;
+        }
+        setStatus("💛 諗緊再安慰你…");
+        pool.execute(() -> {
+            java.util.List<String> hist = new java.util.ArrayList<>(lastReplies);
+            if (hist.size() > 3) hist = new java.util.ArrayList<>(hist.subList(hist.size() - 3, hist.size()));
+            final AiEngine.Response r = AiEngine.respondMore(this, lastTopic, hist);
+            ui.post(() -> {
+                VoicePlayer.speak(this, r.reply, r.emotion, r.tag);
+                lastReplies.add(r.reply);
+                if (lastReplies.size() > 6) lastReplies.remove(0);
+                setStatus(counterLine() + "💛「" + lastTopic + "」｜" + r.reply);
+            });
+        });
     }
 
     /** 🔨 駁返佢：AI 用真實記錄做證據，幫佢諗一句反駁。 */

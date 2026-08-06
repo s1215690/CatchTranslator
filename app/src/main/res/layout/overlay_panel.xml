@@ -87,6 +87,18 @@
             android:text="…" />
     </LinearLayout>
 
+    <!-- 再安慰多啲：同一主題繼續生成（撳其他按鈕／發新嘢先會換主題） -->
+    <Button
+        android:id="@+id/btnMoreComfort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/btn_bg"
+        android:minHeight="44dp"
+        android:text="💛 再安慰多啲"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

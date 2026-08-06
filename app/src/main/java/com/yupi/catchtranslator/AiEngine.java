@@ -356,6 +356,74 @@ public class AiEngine {
         return fallback(text, narration, btnCount);
     }
 
+    // ---------- 再安慰多啲（同一主題繼續） ----------
+
+    private static final String[] MORE_COMFORT = {
+            "翻譯官把聲又細咗少少——你而家聽到嘅，開始係你自己。",
+            "唔使一次過信晒佢，淨係知佢又講緊嘢，已經夠。",
+            "你唔使即刻好返，可以慢慢唞——呢一刻你喺度，就係證據。",
+            "嗰句嘢已經講完咗，而家唔使跟佢行，跟住自己嘅呼吸就得。",
+            "翻譯官講嘅係舊錄音，你而家嘅一刻係新嘅。",
+            "佢想你覺得自己冇價值，但你仲喺度揀聽唔聽——呢樣嘢佢搶唔走。",
+            "唔使答佢。你淨係望住佢，佢就會縮。",
+            "你已經識得叫佢做翻譯官——呢一步好大，好多人都未到。",
+    };
+    private static int moreIdx = -1;
+
+    /** 同一主題繼續安慰：傳埋之前講過嘅嘢，AI 會換角度、唔重複。 */
+    public static Response respondMore(Context ctx, String topic, List<String> history) {
+        SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        String key = p.getString("api_key", "");
+        if (!key.isEmpty()) {
+            try {
+                String hist = "";
+                if (history != null && !history.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (String h : history) sb.append("「").append(h).append("」\n");
+                    hist = sb.toString();
+                }
+                String sys = "你係「YupiSaver」嘅安慰延續引擎。用戶撳咗「再安慰多啲」，想繼續傾同一個主題：「" + truncate(topic, 80) + "」。\n"
+                        + "背景：" + nowTime() + "。佢最近嘅記錄：\n" + recordsContext(ctx, 5)
+                        + "\n你之前已經安慰過佢，講過呢啲：\n" + (hist.isEmpty() ? "（未有）" : hist)
+                        + "\n而家要做：\n"
+                        + "1. 同一主題，繼續安慰——但一定要換角度，千祈唔好重複上面已經講過嘅嘢。\n"
+                        + "2. 角度可以輪住嚟：抽離指認 → 身體錨點 → 陪伴比喻 → 收窄落地；越講越貼身、越溫柔。\n"
+                        + "3. 用廣東話寫30-60字。\n"
+                        + "4. 唔好問問題、唔好用「你應該」「你必須」、唔好以「收到」「OK」開頭、唔好做應答式確認。\n"
+                        + "5. emotion：普通安慰用「calm」或「」（自然）；只有佢明言好攰好痛先至用「sad」（好少用，聽落會似嘆氣）。\n"
+                        + "6. tag 係稀有調味：冇明確表情位就留空；sighs 要句入面有「唉／算啦」先可以用。\n"
+                        + "只輸出JSON：{\"emotion\":\"calm\",\"tag\":\"\",\"reply\":\"...\"}";
+                String out = DeepSeekClient.chat(
+                        p.getString("base_url", "https://api.deepseek.com"),
+                        key, p.getString("model", "deepseek-chat"), sys, "繼續安慰。", 800, thinking(ctx));
+                JSONObject j = new JSONObject(extractJson(out));
+                String reply = j.optString("reply", "").trim();
+                String emotion = emotionForContent(reply, j.optString("emotion", ""));
+                String aiTag = safeTag(j.optString("tag", ""));
+                String tag = contentMatch(reply, aiTag) ? aiTag : "";
+                if (tag.isEmpty()) tag = suggestTag(reply, emotion);
+                tag = throttleTag(tag);
+                if (!reply.isEmpty() && reply.length() <= 150) {
+                    DebugLog.add("AI", "再安慰 OK: emotion=" + emotion + " | tag=" + tag
+                            + " | reply=" + truncate(reply, 80));
+                    return new Response("other", reply, null, emotion, tag);
+                }
+                DebugLog.add("AI", "再安慰解析失敗 → fallback 池");
+            } catch (Exception e) {
+                DebugLog.add("AI", "再安慰異常: " + e.getClass().getSimpleName());
+            }
+        }
+        // 本地兜底：避開上次用過嗰句
+        int idx;
+        do {
+            idx = Math.abs(new Random().nextInt()) % MORE_COMFORT.length;
+        } while (idx == moreIdx && MORE_COMFORT.length > 1);
+        moreIdx = idx;
+        String reply = MORE_COMFORT[idx];
+        String tag = throttleTag(suggestTag(reply, ""));
+        return new Response("other", reply, null, "calm", tag);
+    }
+
     /** 感恩練習引導句：每次唔同，引導佢諗「而家擁有／已經得到咗」啲乜。 */
     public static String gratitudePrompt(Context ctx) {
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
