@@ -7,6 +7,9 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.drawable.Icon;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Handler;
@@ -27,6 +30,8 @@ public class ActiveComfortService extends Service {
     public static final String ACTION_STOP = "com.yupi.catchtranslator.STOP_ACTIVE_COMFORT";
     public static final String PREF_ENABLED = "active_comfort_enabled";
     public static final String PREF_INTERVAL = "active_comfort_interval_minutes";
+    public static final String PREF_LAUNCH_ASSISTANT = "active_comfort_launch_assistant";
+    private static final String CHATGPT_PACKAGE = "com.openai.chatgpt";
 
     private static final int NOTIFICATION_ID = 8;
     public static final int DEFAULT_INTERVAL_MINUTES = 20;
@@ -56,6 +61,38 @@ public class ActiveComfortService extends Service {
         int value = context.getSharedPreferences("settings", MODE_PRIVATE)
                 .getInt(PREF_INTERVAL, DEFAULT_INTERVAL_MINUTES);
         return Math.max(MIN_INTERVAL_MINUTES, Math.min(MAX_INTERVAL_MINUTES, value));
+    }
+
+    /**
+     * 嘗試呼叫 ChatGPT 作為系統助理；如果它不是預設助理，就直接打開 ChatGPT App。
+     * 是否自動進入 Voice 取決於 ChatGPT 自己的 Start with Voice 設定。
+     */
+    public static boolean tryLaunchAssistant(Context context) {
+        Intent launch = createAssistantLaunchIntent(context);
+        if (launch == null) return false;
+        try {
+            context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            DebugLog.add("Comfort", "已嘗試打開 ChatGPT／系統助理");
+            return true;
+        } catch (Exception e) {
+            DebugLog.add("Comfort", "打開 ChatGPT／系統助理失敗: "
+                    + e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    private static Intent createAssistantLaunchIntent(Context context) {
+        PackageManager manager = context.getPackageManager();
+        Intent assist = new Intent(Intent.ACTION_ASSIST);
+        ResolveInfo resolved = manager.resolveActivity(assist, PackageManager.MATCH_DEFAULT_ONLY);
+        if (resolved != null && resolved.activityInfo != null
+                && CHATGPT_PACKAGE.equals(resolved.activityInfo.packageName)) {
+            return assist;
+        }
+        Intent chatGpt = manager.getLaunchIntentForPackage(CHATGPT_PACKAGE);
+        return chatGpt;
     }
 
     @Override
@@ -142,8 +179,16 @@ public class ActiveComfortService extends Service {
         } catch (Exception e) {
             DebugLog.add("Comfort", "儲存主動安慰記錄失敗: " + e.getClass().getSimpleName());
         }
-        VoicePlayer.speak(this, response.reply, response.emotion, response.tag);
-        updateStatus("剛剛已播放安慰 · 下次每 " + intervalDescription());
+        boolean launchAssistant = getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean(PREF_LAUNCH_ASSISTANT, false);
+        if (launchAssistant && tryLaunchAssistant(this)) {
+            updateStatus("已嘗試打開 ChatGPT 語音 · 下次每 " + intervalDescription());
+        } else {
+            VoicePlayer.speak(this, response.reply, response.emotion, response.tag);
+            updateStatus(launchAssistant
+                    ? "ChatGPT 未能打開，已改用本機語音 · 下次每 " + intervalDescription()
+                    : "剛剛已播放安慰 · 下次每 " + intervalDescription());
+        }
         scheduleAfter(intervalDelayMs());
     }
 
@@ -181,13 +226,24 @@ public class ActiveComfortService extends Service {
         PendingIntent pending = PendingIntent.getActivity(this, NOTIFICATION_ID, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String text = lastStatus.isEmpty() ? "等待下一段溫柔安慰" : lastStatus;
-        return new Notification.Builder(this, CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("YupiSaver · 主動安慰")
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_notif)
                 .setContentIntent(pending)
-                .setOngoing(true)
-                .build();
+                .setOngoing(true);
+        Intent assistant = createAssistantLaunchIntent(this);
+        if (assistant != null) {
+            PendingIntent assistantPending = PendingIntent.getActivity(this, 9,
+                    assistant.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(new Notification.Action.Builder(
+                    Icon.createWithResource(this, R.drawable.ic_notif),
+                    "打開 ChatGPT", assistantPending).build());
+        }
+        return builder.build();
     }
 
     private void updateStatus(String status) {

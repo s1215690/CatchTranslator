@@ -46,6 +46,8 @@ public class MainActivity extends Activity {
     private Switch swBluetoothKeepAlive;
     private TextView tvBluetoothKeepAliveStatus;
     private Switch swActiveComfort;
+    private Switch swActiveComfortAssistant;
+    private Button btnTestActiveComfortAssistant;
     private EditText etActiveComfortInterval;
     private Button btnApplyActiveComfortInterval;
     private TextView tvActiveComfortStatus;
@@ -106,6 +108,8 @@ public class MainActivity extends Activity {
         swBluetoothKeepAlive = findViewById(R.id.swBluetoothKeepAlive);
         tvBluetoothKeepAliveStatus = findViewById(R.id.tvBluetoothKeepAliveStatus);
         swActiveComfort = findViewById(R.id.swActiveComfort);
+        swActiveComfortAssistant = findViewById(R.id.swActiveComfortAssistant);
+        btnTestActiveComfortAssistant = findViewById(R.id.btnTestActiveComfortAssistant);
         etActiveComfortInterval = findViewById(R.id.etActiveComfortInterval);
         btnApplyActiveComfortInterval = findViewById(R.id.btnApplyActiveComfortInterval);
         tvActiveComfortStatus = findViewById(R.id.tvActiveComfortStatus);
@@ -156,6 +160,8 @@ public class MainActivity extends Activity {
         etDebugToken.setText(p.getString("debug_token", ""));
         etDebugChatId.setText(p.getString("debug_chat_id", ""));
         etActiveComfortInterval.setText(String.valueOf(ActiveComfortService.getIntervalMinutes(this)));
+        swActiveComfortAssistant.setChecked(p.getBoolean(
+                ActiveComfortService.PREF_LAUNCH_ASSISTANT, false));
 
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
         btnAiConfigToggle.setOnClickListener(v ->
@@ -166,6 +172,24 @@ public class MainActivity extends Activity {
                 toggleSection(llVoiceConfig, btnVoiceConfigToggle, "🔊 語音設定"));
         swActiveComfort.setOnCheckedChangeListener((button, checked) -> {
             if (!refreshingActiveComfort) setActiveComfort(checked);
+        });
+        swActiveComfortAssistant.setOnCheckedChangeListener((button, checked) -> {
+            if (!refreshingActiveComfort) {
+                getSharedPreferences("settings", MODE_PRIVATE).edit()
+                        .putBoolean(ActiveComfortService.PREF_LAUNCH_ASSISTANT, checked).apply();
+                Toast.makeText(this, checked
+                        ? "到點會嘗試打開 ChatGPT 語音"
+                        : "已改回本機語音安慰", Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnTestActiveComfortAssistant.setOnClickListener(v -> {
+            if (ActiveComfortService.tryLaunchAssistant(this)) {
+                Toast.makeText(this, "已嘗試打開 ChatGPT／系統助理", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this,
+                        "找不到 ChatGPT，或未允許系統助理；請先安裝並設為預設助理",
+                        Toast.LENGTH_LONG).show();
+            }
         });
         btnApplyActiveComfortInterval.setOnClickListener(v -> applyActiveComfortInterval());
         btnLogToggle = findViewById(R.id.btnLogToggle);
@@ -670,9 +694,14 @@ public class MainActivity extends Activity {
     private void refreshActiveComfort() {
         SharedPreferences p = getSharedPreferences("settings", MODE_PRIVATE);
         boolean enabled = p.getBoolean(ActiveComfortService.PREF_ENABLED, false);
+        boolean launchAssistant = p.getBoolean(
+                ActiveComfortService.PREF_LAUNCH_ASSISTANT, false);
         int minutes = ActiveComfortService.getIntervalMinutes(this);
         refreshingActiveComfort = true;
         if (swActiveComfort.isChecked() != enabled) swActiveComfort.setChecked(enabled);
+        if (swActiveComfortAssistant.isChecked() != launchAssistant) {
+            swActiveComfortAssistant.setChecked(launchAssistant);
+        }
         if (!etActiveComfortInterval.hasFocus()) {
             etActiveComfortInterval.setText(String.valueOf(minutes));
         }

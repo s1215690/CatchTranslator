@@ -314,6 +314,33 @@
             android:text="開啟主動安慰（背景運行）"
             android:textSize="14sp" />
 
+        <Switch
+            android:id="@+id/swActiveComfortAssistant"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:checked="false"
+            android:text="到點嘗試打開 ChatGPT 語音（取代本機語音）"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnTestActiveComfortAssistant"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/btn_bg"
+            android:text="測試打開 ChatGPT 語音"
+            android:textAllCaps="false"
+            android:textColor="#2E7D5B" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="先喺 ChatGPT → 設定 → 語音開啟「Start with Voice」。如果 Android 阻止背景彈窗，會保留本機安慰語音。"
+            android:textSize="12sp"
+            android:textColor="#7FA88F" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
