@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
     private Button btnTestActiveComfortAssistant;
     private EditText etActiveComfortInterval;
     private Button btnApplyActiveComfortInterval;
-    private TextView tvActiveComfortStatus;
+    private TextView tvActiveComfortStatus, tvActiveComfortAssistantStatus;
     private boolean refreshingActiveComfort;
     private int pendingBluetoothAction = 0;
     private static final int BLUETOOTH_ACTION_ENABLE = 1;
@@ -113,6 +113,7 @@ public class MainActivity extends Activity {
         etActiveComfortInterval = findViewById(R.id.etActiveComfortInterval);
         btnApplyActiveComfortInterval = findViewById(R.id.btnApplyActiveComfortInterval);
         tvActiveComfortStatus = findViewById(R.id.tvActiveComfortStatus);
+        tvActiveComfortAssistantStatus = findViewById(R.id.tvActiveComfortAssistantStatus);
         rgSize = findViewById(R.id.rgSize);
         rgVoice = findViewById(R.id.rgVoice);
         rgBtnCount = findViewById(R.id.rgBtnCount);
@@ -183,13 +184,13 @@ public class MainActivity extends Activity {
             }
         });
         btnTestActiveComfortAssistant.setOnClickListener(v -> {
-            if (ActiveComfortService.tryLaunchAssistant(this)) {
-                Toast.makeText(this, "已嘗試打開 ChatGPT／系統助理", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this,
-                        "找不到 ChatGPT，或未允許系統助理；請先安裝並設為預設助理",
-                        Toast.LENGTH_LONG).show();
-            }
+            boolean launched = ActiveComfortService.tryLaunchAssistant(this);
+            tvActiveComfortAssistantStatus.setText(
+                    ActiveComfortService.getAssistantStatus(this));
+            Toast.makeText(this, launched
+                    ? "已呼叫 ChatGPT 語音 Activity"
+                    : "ChatGPT 語音未能啟動，請查看下方診斷",
+                    launched ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
         });
         btnApplyActiveComfortInterval.setOnClickListener(v -> applyActiveComfortInterval());
         btnLogToggle = findViewById(R.id.btnLogToggle);
@@ -713,6 +714,8 @@ public class MainActivity extends Activity {
         tvActiveComfortStatus.setText(enabled
                 ? "主動安慰已開啟 · 每 " + intervalLabel + "生成並播出（其他播放時會暫停）"
                 : "目前未啟用");
+        tvActiveComfortAssistantStatus.setText(
+                ActiveComfortService.getAssistantStatus(this));
     }
 
     private void setActiveComfort(boolean enabled) {
