@@ -38,11 +38,16 @@ public class BluetoothKeepAliveService extends Service {
     private static final int NOTIFICATION_ID = 7;
     private static final int SAMPLE_RATE = 48_000;
     private static final int CHANNEL_MASK = AudioFormat.CHANNEL_OUT_STEREO;
-    private static final int SIGNAL_FRAMES = SAMPLE_RATE / 5; // 200 ms；19 kHz 下剛好完整週期
+    private static final int SIGNAL_FRAMES = SAMPLE_RATE / 5; // 200 ms；方便無縫循環
     private static final long MONITOR_INTERVAL_MS = 2_000L;
-    private static final double SIGNAL_FREQUENCY = 19_000.0;
-    private static final double SIGNAL_AMPLITUDE = 800.0 / 32767.0;
-    private static final float TRACK_VOLUME = 0.03f;
+    private static final long ROUTE_VERIFY_DELAY_MS = 500L;
+    // 19 kHz 在部分藍牙編碼器會被當成靜音；混入很低音量的 320 Hz，較容易被音箱的休眠偵測辨認。
+    private static final double LOW_SIGNAL_FREQUENCY = 320.0;
+    private static final double HIGH_SIGNAL_FREQUENCY = 17_500.0;
+    private static final double LOW_SIGNAL_AMPLITUDE = 1_200.0 / 32767.0;
+    private static final double HIGH_SIGNAL_AMPLITUDE = 160.0 / 32767.0;
+    // 比舊版約高 10 dB，仍然是近乎聽不到的每軌增益；音箱若仍休眠，只能再提高強度。
+    private static final float TRACK_VOLUME = 0.06f;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
@@ -174,10 +179,39 @@ public class BluetoothKeepAliveService extends Service {
         if (manager == null) return null;
         try {
             for (AudioDeviceInfo device : manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
-                if (device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) return device;
+                if (isBluetoothOutput(device)) return device;
             }
         } catch (SecurityException ignored) {}
         return null;
+    }
+
+    private static boolean isBluetoothOutput(AudioDeviceInfo device) {
+        if (device == null) return false;
+        int type = device.getType();
+        if (type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) return true;
+        return Build.VERSION.SDK_INT >= 31
+                && (type == AudioDeviceInfo.TYPE_BLE_HEADSET
+                || type == AudioDeviceInfo.TYPE_BLE_SPEAKER);
+    }
+
+    private static boolean isRoutedToDevice(AudioTrack track, AudioDeviceInfo expected) {
+        if (track == null || expected == null) return false;
+        try {
+            AudioDeviceInfo routed = track.getRoutedDevice();
+            return routed != null
+                    && isBluetoothOutput(routed)
+                    && routed.getId() == expected.getId();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isTrackPlaying(AudioTrack track) {
+        try {
+            return track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static String deviceName(AudioDeviceInfo device) {
@@ -213,10 +247,22 @@ public class BluetoothKeepAliveService extends Service {
             updateStatus(getConnectedDeviceName(this));
             return;
         }
-        if (audioTrack == null || currentDevice == null || currentDevice.getId() != device.getId()) {
+        boolean trackReady = audioTrack != null
+                && currentDevice != null
+                && currentDevice.getId() == device.getId()
+                && audioLoopRunning
+                && audioThread != null
+                && audioThread.isAlive()
+                && isTrackPlaying(audioTrack)
+                && isRoutedToDevice(audioTrack, device);
+        if (!trackReady) {
+            if (audioTrack != null) {
+                updateStatus("藍牙音箱路由未保持，正在重試");
+            }
             startAudio(device);
+        } else {
+            updateStatus("保活中 · " + deviceName(device) + "（近乎靜音）");
         }
-        updateStatus("保活中 · " + deviceName(device) + "（近乎靜音）");
     }
 
     /**
@@ -268,7 +314,11 @@ public class BluetoothKeepAliveService extends Service {
                 updateStatus("手機音頻輸出初始化失敗");
                 return;
             }
-            candidate.setPreferredDevice(device);
+            if (!candidate.setPreferredDevice(device)) {
+                candidate.release();
+                updateStatus("藍牙音箱路由設定失敗，稍後重試");
+                return;
+            }
             candidate.setVolume(TRACK_VOLUME);
             candidate.play();
             keepAliveAudioActive = true;
@@ -278,6 +328,14 @@ public class BluetoothKeepAliveService extends Service {
             final AudioTrack local = candidate;
             audioThread = new Thread(() -> writeSignal(local), "BluetoothKeepAlive");
             audioThread.start();
+            updateStatus("保活啟動中 · 正在確認藍牙音箱路由");
+            handler.postDelayed(() -> {
+                if (audioTrack != local || !audioLoopRunning) return;
+                if (!isRoutedToDevice(local, device)) {
+                    updateStatus("藍牙音箱路由未生效，正在重試");
+                    stopAudio();
+                }
+            }, ROUTE_VERIFY_DELAY_MS);
         } catch (Exception e) {
             if (candidate != null) {
                 try { candidate.release(); } catch (Exception ignored) {}
@@ -290,9 +348,10 @@ public class BluetoothKeepAliveService extends Service {
         short[] signal = createSignal();
         try {
             while (audioLoopRunning && audioTrack == local
+                    && isTrackPlaying(local)
                     && !VoicePlayer.isPlaybackActive()) {
                 int written = local.write(signal, 0, signal.length, AudioTrack.WRITE_BLOCKING);
-                if (written < 0) break;
+                if (written <= 0) break;
             }
         } catch (Exception ignored) {
             // 路由切換或音箱斷線時由主線程重新建立／停止 AudioTrack。
@@ -307,9 +366,12 @@ public class BluetoothKeepAliveService extends Service {
 
     private static short[] createSignal() {
         short[] signal = new short[SIGNAL_FRAMES * 2];
-        double step = 2.0 * Math.PI * SIGNAL_FREQUENCY / SAMPLE_RATE;
+        double lowStep = 2.0 * Math.PI * LOW_SIGNAL_FREQUENCY / SAMPLE_RATE;
+        double highStep = 2.0 * Math.PI * HIGH_SIGNAL_FREQUENCY / SAMPLE_RATE;
         for (int frame = 0; frame < SIGNAL_FRAMES; frame++) {
-            short sample = (short) Math.round(Math.sin(frame * step) * Short.MAX_VALUE * SIGNAL_AMPLITUDE);
+            double sampleValue = Math.sin(frame * lowStep) * LOW_SIGNAL_AMPLITUDE
+                    + Math.sin(frame * highStep) * HIGH_SIGNAL_AMPLITUDE;
+            short sample = (short) Math.round(sampleValue * Short.MAX_VALUE);
             signal[frame * 2] = sample;
             signal[frame * 2 + 1] = sample;
         }
@@ -322,6 +384,7 @@ public class BluetoothKeepAliveService extends Service {
         AudioTrack local = audioTrack;
         audioTrack = null;
         currentDevice = null;
+        audioThread = null;
         if (local != null) {
             try { local.pause(); } catch (Exception ignored) {}
             try { local.flush(); } catch (Exception ignored) {}
