@@ -196,13 +196,17 @@ public class BluetoothKeepAliveService extends Service {
 
     private static boolean isRoutedToDevice(AudioTrack track, AudioDeviceInfo expected) {
         if (track == null || expected == null) return false;
+        AudioDeviceInfo routed = getRoutedDevice(track);
+        return routed != null
+                && isBluetoothOutput(routed)
+                && routed.getId() == expected.getId();
+    }
+
+    private static AudioDeviceInfo getRoutedDevice(AudioTrack track) {
         try {
-            AudioDeviceInfo routed = track.getRoutedDevice();
-            return routed != null
-                    && isBluetoothOutput(routed)
-                    && routed.getId() == expected.getId();
+            return track == null ? null : track.getRoutedDevice();
         } catch (Exception ignored) {
-            return false;
+            return null;
         }
     }
 
@@ -215,6 +219,7 @@ public class BluetoothKeepAliveService extends Service {
     }
 
     private static String deviceName(AudioDeviceInfo device) {
+        if (device == null) return "未確認輸出設備";
         CharSequence name = device.getProductName();
         return name == null || name.length() == 0 ? "已連接的藍牙音箱" : name.toString();
     }
@@ -261,7 +266,9 @@ public class BluetoothKeepAliveService extends Service {
             }
             startAudio(device);
         } else {
-            updateStatus("保活中 · " + deviceName(device) + "（近乎靜音）");
+            AudioDeviceInfo routed = getRoutedDevice(audioTrack);
+            updateStatus("保活中 · 實際輸出：" + deviceName(routed)
+                    + "（近乎靜音）");
         }
     }
 
@@ -321,6 +328,8 @@ public class BluetoothKeepAliveService extends Service {
             }
             candidate.setVolume(TRACK_VOLUME);
             candidate.play();
+            // 部分手機要在 AudioTrack 開始播放後再次指定，才會真正切到 A2DP。
+            candidate.setPreferredDevice(device);
             keepAliveAudioActive = true;
             audioTrack = candidate;
             currentDevice = device;
@@ -334,6 +343,9 @@ public class BluetoothKeepAliveService extends Service {
                 if (!isRoutedToDevice(local, device)) {
                     updateStatus("藍牙音箱路由未生效，正在重試");
                     stopAudio();
+                } else {
+                    updateStatus("保活中 · 實際輸出：" + deviceName(getRoutedDevice(local))
+                            + "（近乎靜音）");
                 }
             }, ROUTE_VERIFY_DELAY_MS);
         } catch (Exception e) {
