@@ -32,6 +32,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -86,6 +87,11 @@ public class FloatingService extends Service {
     private LinearLayout llFollowup;
     private Button btnFollow1, btnFollow2;
     private Button btnMoreComfort;
+    private Switch swOverlayBluetooth;
+    private Switch swOverlayActiveComfort;
+    private Switch swOverlayComfortAssistant;
+    private TextView tvOverlayQuickStatus;
+    private boolean refreshingQuickControls;
 
     // 「再安慰多啲」主題狀態：新捕捉／新輸入先會重置
     private String lastTopic = "";
@@ -345,6 +351,10 @@ public class FloatingService extends Service {
         View refresh = panel.findViewById(R.id.btnRefresh);
         View mic = panel.findViewById(R.id.btnMic);
         View send = panel.findViewById(R.id.btnSend);
+        swOverlayBluetooth = panel.findViewById(R.id.swOverlayBluetooth);
+        swOverlayActiveComfort = panel.findViewById(R.id.swOverlayActiveComfort);
+        swOverlayComfortAssistant = panel.findViewById(R.id.swOverlayComfortAssistant);
+        tvOverlayQuickStatus = panel.findViewById(R.id.tvOverlayQuickStatus);
 
         close.setOnClickListener(v -> closePanel());
         refresh.setOnClickListener(v -> regenerate());
@@ -356,6 +366,7 @@ public class FloatingService extends Service {
                 record(t, "text");
             }
         });
+        wireQuickControls();
         nudgeBtn = panel.findViewById(R.id.btnNudge);
         btnTimedNudge = panel.findViewById(R.id.btnTimedNudge);
         btnGratitude = panel.findViewById(R.id.btnGratitude);
@@ -378,6 +389,65 @@ public class FloatingService extends Service {
                 ? "今日建議：「" + todayHint() + "」——撳🚀開始"
                 : "翻譯官一出聲，就撳個掣捉住佢");
         setStatus(base);
+    }
+
+    /** 懸浮面板快速開關：唔使離開目前 App 就可以控制兩個背景服務。 */
+    private void wireQuickControls() {
+        refreshingQuickControls = true;
+        swOverlayBluetooth.setChecked(BluetoothKeepAliveService.isEnabled(this));
+        swOverlayActiveComfort.setChecked(ActiveComfortService.isEnabled(this));
+        swOverlayComfortAssistant.setChecked(getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean(ActiveComfortService.PREF_LAUNCH_ASSISTANT, false));
+        refreshingQuickControls = false;
+
+        swOverlayBluetooth.setOnCheckedChangeListener((button, checked) -> {
+            if (refreshingQuickControls) return;
+            if (!BluetoothKeepAliveService.setEnabled(this, checked)) {
+                refreshingQuickControls = true;
+                swOverlayBluetooth.setChecked(false);
+                refreshingQuickControls = false;
+                setQuickControlStatus("藍牙保活未開啟：請先在主 App 授予「附近的設備」權限");
+                Toast.makeText(this, "請先在主 App 授予附近設備權限", Toast.LENGTH_LONG).show();
+                return;
+            }
+            setQuickControlStatus(checked ? "藍牙音箱保活已開啟" : "藍牙音箱保活已關閉");
+        });
+        swOverlayActiveComfort.setOnCheckedChangeListener((button, checked) -> {
+            if (refreshingQuickControls) return;
+            if (!ActiveComfortService.setEnabled(this, checked)) {
+                refreshingQuickControls = true;
+                swOverlayActiveComfort.setChecked(false);
+                refreshingQuickControls = false;
+                setQuickControlStatus("主動安慰未能啟動，請查看通知權限");
+                Toast.makeText(this, "主動安慰未能啟動，請查看通知權限", Toast.LENGTH_LONG).show();
+                return;
+            }
+            setQuickControlStatus(checked ? "主動安慰已開啟" : "主動安慰已關閉");
+        });
+        swOverlayComfortAssistant.setOnCheckedChangeListener((button, checked) -> {
+            if (refreshingQuickControls) return;
+            getSharedPreferences("settings", MODE_PRIVATE).edit()
+                    .putBoolean(ActiveComfortService.PREF_LAUNCH_ASSISTANT, checked).apply();
+            setQuickControlStatus(checked
+                    ? "安慰播放完後會打開 ChatGPT 語音"
+                    : "安慰只播放本機語音");
+        });
+        refreshQuickControls();
+    }
+
+    private void refreshQuickControls() {
+        if (tvOverlayQuickStatus == null) return;
+        boolean bluetooth = BluetoothKeepAliveService.isEnabled(this);
+        boolean comfort = ActiveComfortService.isEnabled(this);
+        boolean assistant = getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean(ActiveComfortService.PREF_LAUNCH_ASSISTANT, false);
+        tvOverlayQuickStatus.setText("藍牙保活：" + (bluetooth ? "開" : "關")
+                + "　主動安慰：" + (comfort ? "開" : "關")
+                + (assistant ? "　安慰後開 ChatGPT" : ""));
+    }
+
+    private void setQuickControlStatus(String status) {
+        if (tvOverlayQuickStatus != null) tvOverlayQuickStatus.setText(status);
     }
 
     /** 動態重建按鈕：兩粒一行，數量跟設定（4/8/10）。 */

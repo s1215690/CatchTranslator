@@ -130,6 +130,34 @@ public class BluetoothKeepAliveService extends Service {
                 .getBoolean(PREF_ENABLED, true);
     }
 
+    /** 供主頁及懸浮面板共用，確保兩邊切換的是同一個保活服務。 */
+    public static boolean setEnabled(Context context, boolean enabled) {
+        if (enabled && Build.VERSION.SDK_INT >= 31
+                && context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                != PackageManager.PERMISSION_GRANTED) {
+            DebugLog.add("Bluetooth", "懸浮面板開啟保活失敗：未授予 BLUETOOTH_CONNECT");
+            return false;
+        }
+        context.getSharedPreferences("settings", MODE_PRIVATE).edit()
+                .putBoolean(PREF_ENABLED, enabled).apply();
+        if (!enabled) {
+            context.stopService(new Intent(context, BluetoothKeepAliveService.class));
+            return true;
+        }
+        try {
+            Intent intent = new Intent(context, BluetoothKeepAliveService.class)
+                    .setAction(ACTION_START);
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent);
+            else context.startService(intent);
+            return true;
+        } catch (Exception e) {
+            context.getSharedPreferences("settings", MODE_PRIVATE).edit()
+                    .putBoolean(PREF_ENABLED, false).apply();
+            DebugLog.add("Bluetooth", "懸浮面板啟動保活失敗: " + e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
     /** 主頁顯示目前是否有 A2DP 藍牙輸出，唔會主動掃描附近設備。 */
     public static String getConnectedDeviceName(Context context) {
         if (Build.VERSION.SDK_INT >= 31

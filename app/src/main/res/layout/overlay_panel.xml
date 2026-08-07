@@ -43,6 +43,51 @@
             android:padding="0dp" />
     </LinearLayout>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="快速開關（不用打開設定頁）"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="#2E7D5B" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Switch
+            android:id="@+id/swOverlayBluetooth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="藍牙保活"
+            android:textSize="12sp" />
+
+        <Switch
+            android:id="@+id/swOverlayActiveComfort"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="主動安慰"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <Switch
+        android:id="@+id/swOverlayComfortAssistant"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="安慰播放完後開 ChatGPT 語音"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tvOverlayQuickStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:textColor="#7FA88F" />
+
     <!-- 按鈕動態生成：4 / 8 / 10 個，兩粒一行；太多時可以捲動 -->
     <ScrollView
         android:layout_width="match_parent"

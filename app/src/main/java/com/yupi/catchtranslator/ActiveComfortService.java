@@ -58,6 +58,28 @@ public class ActiveComfortService extends Service {
                 .getBoolean(PREF_ENABLED, false);
     }
 
+    /** 供主頁及懸浮面板共用，確保兩邊切換的是同一個主動安慰服務。 */
+    public static boolean setEnabled(Context context, boolean enabled) {
+        context.getSharedPreferences("settings", MODE_PRIVATE).edit()
+                .putBoolean(PREF_ENABLED, enabled).apply();
+        if (!enabled) {
+            context.stopService(new Intent(context, ActiveComfortService.class));
+            return true;
+        }
+        try {
+            Intent intent = new Intent(context, ActiveComfortService.class)
+                    .setAction(ACTION_START);
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent);
+            else context.startService(intent);
+            return true;
+        } catch (Exception e) {
+            context.getSharedPreferences("settings", MODE_PRIVATE).edit()
+                    .putBoolean(PREF_ENABLED, false).apply();
+            DebugLog.add("Comfort", "懸浮面板啟動主動安慰失敗: " + e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
     public static boolean isRunning() {
         return running;
     }
