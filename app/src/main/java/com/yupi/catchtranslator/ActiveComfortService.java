@@ -243,14 +243,26 @@ public class ActiveComfortService extends Service {
         }
         boolean launchAssistant = getSharedPreferences("settings", MODE_PRIVATE)
                 .getBoolean(PREF_LAUNCH_ASSISTANT, false);
-        if (launchAssistant && tryLaunchAssistant(this)) {
-            updateStatus("已嘗試打開 ChatGPT 語音 · 下次每 " + intervalDescription());
+        if (launchAssistant) {
+            VoicePlayer.speak(this, response.reply, response.emotion, response.tag, () -> {
+                if (!isEnabled(this)
+                        || !getSharedPreferences("settings", MODE_PRIVATE)
+                        .getBoolean(PREF_LAUNCH_ASSISTANT, false)) {
+                    return;
+                }
+                if (tryLaunchAssistant(this)) {
+                    updateStatus("安慰已播放完，已打開 ChatGPT 語音 · 下次每 "
+                            + intervalDescription());
+                } else {
+                    updateStatus("安慰已播放完，但 ChatGPT 未能打開（"
+                            + getAssistantStatus(this) + "）· 下次每 " + intervalDescription());
+                }
+            });
+            updateStatus("正在播放安慰，完成後打開 ChatGPT 語音 · 下次每 "
+                    + intervalDescription());
         } else {
             VoicePlayer.speak(this, response.reply, response.emotion, response.tag);
-            updateStatus(launchAssistant
-                    ? "ChatGPT 未能打開（" + getAssistantStatus(this)
-                    + "），已改用本機語音 · 下次每 " + intervalDescription()
-                    : "剛剛已播放安慰 · 下次每 " + intervalDescription());
+            updateStatus("剛剛已播放安慰 · 下次每 " + intervalDescription());
         }
         scheduleAfter(intervalDelayMs());
     }

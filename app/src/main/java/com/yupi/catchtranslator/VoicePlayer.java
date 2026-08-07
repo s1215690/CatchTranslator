@@ -25,6 +25,7 @@ public class VoicePlayer {
     private static boolean legacyCacheCleared = false;
     private static int activeFilePlayers = 0;
     private static String activeTtsUtterance;
+    private static Runnable activeTtsCompletion;
 
     /** 供藍牙保活服務讓路：App 正在出聲時暫停保活訊號。 */
     public static synchronized boolean isPlaybackActive() {
@@ -63,6 +64,12 @@ public class VoicePlayer {
      * tag：句內語氣標籤（laughs/sighs/gasps/emm…，speech-2.8 專用）。Edge／系統 TTS 唔支持，會自動忽略。
      */
     public static void speak(final Context ctx, final String text, final String emotionOverride, final String tag) {
+        speak(ctx, text, emotionOverride, tag, null);
+    }
+
+    /** 播放完成後回調；合成、播放或系統 TTS 失敗時也會回調，避免流程卡住。 */
+    public static void speak(final Context ctx, final String text, final String emotionOverride,
+                             final String tag, final Runnable onComplete) {
         if (text == null || text.isEmpty()) return;
         clearLegacyCacheOnce(ctx);
         SharedPreferences p = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
@@ -82,13 +89,13 @@ public class VoicePlayer {
                     DebugLog.add("TTS", "Edge 重新合成中: " + truncate(text, 50));
                     EdgeTts.synthesize(text, voice, ratePct, pitch, out);
                     final File f = out;
-                    MAIN.post(() -> playFile(ctx, f, text, ratePct));
+                    MAIN.post(() -> playFile(ctx, f, text, ratePct, onComplete));
                 } catch (Exception e) {
                     deleteQuietly(out);
                     DebugLog.add("TTS", "Edge 失敗: " + truncate(e.getMessage(), 100));
-                    if (tryMiniMax(ctx, p, text, emotionOverride, tag, ratePct)) return; // 回退鏈
+                    if (tryMiniMax(ctx, p, text, emotionOverride, tag, ratePct, onComplete)) return; // 回退鏈
                     notifyFallback(engine, e.getMessage());
-                    playSystem(ctx, text, ratePct);
+                    playSystem(ctx, text, ratePct, onComplete);
                 }
             });
         } else if ("minimax".equals(engine)) {
@@ -107,16 +114,16 @@ public class VoicePlayer {
                     DebugLog.add("TTS", "MiniMax 重新合成中: " + truncate(finalText, 50));
                     MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
                     final File f = out;
-                    MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
+                    MAIN.post(() -> playFile(ctx, f, finalText, ratePct, onComplete));
                 } catch (Exception e) {
                     deleteQuietly(out);
                     DebugLog.add("TTS", "MiniMax 失敗: " + truncate(e.getMessage(), 100));
                     notifyFallback(engine, e.getMessage());
-                    playSystem(ctx, text, ratePct);
+                    playSystem(ctx, text, ratePct, onComplete);
                 }
             });
         } else {
-            playSystem(ctx, text, ratePct);
+            playSystem(ctx, text, ratePct, onComplete);
         }
     }
 
@@ -133,7 +140,8 @@ public class VoicePlayer {
      * 因為系統 TTS 好多時冇粵語／未就緒，靜音就係咁嚟——所以中間加多一層。
      */
     private static boolean tryMiniMax(Context ctx, SharedPreferences p, String text,
-                                      String emotion, String tag, String ratePct) {
+                                      String emotion, String tag, String ratePct,
+                                      Runnable onComplete) {
         String mmKey = p.getString("minimax_key", "");
         if (mmKey.isEmpty()) {
             DebugLog.add("TTS", "回退 MiniMax: 冇 key，跳過");
@@ -151,7 +159,7 @@ public class VoicePlayer {
             DebugLog.add("TTS", "回退重新合成中（MiniMax）: " + truncate(finalText, 50));
             MiniMaxTts.synthesize(mmKey, finalText, mmVoice, mmModel, ratePct, mmEmotion, null, out);
             final File f = out;
-            MAIN.post(() -> playFile(ctx, f, finalText, ratePct));
+            MAIN.post(() -> playFile(ctx, f, finalText, ratePct, onComplete));
             DebugLog.add("TTS", "Edge→MiniMax 回退成功");
             return true;
         } catch (Exception e2) {
@@ -206,13 +214,20 @@ public class VoicePlayer {
     public static void playTemporaryFile(final Context ctx, final File file,
                                          final String fallbackText, final String ratePct) {
         if (file == null || !file.exists()) {
-            playSystem(ctx, fallbackText, ratePct);
+            playSystem(ctx, fallbackText, ratePct, null);
             return;
         }
-        MAIN.post(() -> playFile(ctx, file, fallbackText, ratePct));
+        MAIN.post(() -> playFile(ctx, file, fallbackText, ratePct, null));
     }
 
-    private static void playFile(final Context ctx, final File f, final String fallbackText, final String ratePct) {
+    private static void playFile(final Context ctx, final File f, final String fallbackText,
+                                 final String ratePct, final Runnable onComplete) {
+        final boolean[] completionSent = {false};
+        final Runnable finish = () -> {
+            if (completionSent[0]) return;
+            completionSent[0] = true;
+            runCompletion(onComplete);
+        };
         try {
             MediaPlayer mp = new MediaPlayer();
             mp.setDataSource(f.getAbsolutePath());
@@ -231,6 +246,7 @@ public class VoicePlayer {
                 }
                 m.release();
                 deleteQuietly(f);
+                finish.run();
             });
             mp.setOnErrorListener((m, what, extra) -> {
                 if (counted[0]) {
@@ -239,22 +255,26 @@ public class VoicePlayer {
                 }
                 try { m.release(); } catch (Exception ignored) {}
                 deleteQuietly(f);
+                finish.run();
                 return true;
             });
             mp.prepareAsync();
         } catch (Exception e) {
             deleteQuietly(f);
-            playSystem(ctx, fallbackText, ratePct);
+            playSystem(ctx, fallbackText, ratePct, onComplete);
         }
     }
 
-    private static void playSystem(final Context ctx, final String text, final String ratePct) {
+    private static void playSystem(final Context ctx, final String text, final String ratePct,
+                                   final Runnable onComplete) {
         MAIN.post(() -> {
             ensureTts(ctx);
             if (!ttsReady || tts == null) {
                 DebugLog.add("TTS", "系統 TTS 未就緒，無法發聲（engine fallback 到尾都冇聲）");
+                runCompletion(onComplete);
                 return;
             }
+            String utteranceId = null;
             try {
                 float rate = 1f;
                 try {
@@ -262,17 +282,20 @@ public class VoicePlayer {
                 } catch (Exception ignored) {}
                 rate = Math.max(0.5f, Math.min(2f, rate));
                 tts.setSpeechRate(rate);
-                String utteranceId = "yupi_" + System.currentTimeMillis();
+                utteranceId = "yupi_" + System.currentTimeMillis();
                 synchronized (VoicePlayer.class) {
                     activeTtsUtterance = utteranceId;
+                    activeTtsCompletion = onComplete;
                 }
                 int result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId);
                 if (result == TextToSpeech.ERROR) {
-                    synchronized (VoicePlayer.class) {
-                        if (utteranceId.equals(activeTtsUtterance)) activeTtsUtterance = null;
-                    }
+                    Runnable completion = finishTtsPlayback(utteranceId);
+                    runCompletion(completion);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Runnable completion = finishTtsPlayback(utteranceId);
+                runCompletion(completion);
+            }
         });
     }
 
@@ -290,12 +313,14 @@ public class VoicePlayer {
 
                     @Override
                     public void onDone(String utteranceId) {
-                        endTtsPlayback(utteranceId);
+                        Runnable completion = finishTtsPlayback(utteranceId);
+                        runCompletion(completion);
                     }
 
                     @Override
                     public void onError(String utteranceId) {
-                        endTtsPlayback(utteranceId);
+                        Runnable completion = finishTtsPlayback(utteranceId);
+                        runCompletion(completion);
                     }
                 });
                 Locale[] tries = {
@@ -319,9 +344,24 @@ public class VoicePlayer {
         if (activeFilePlayers > 0) activeFilePlayers--;
     }
 
-    private static synchronized void endTtsPlayback(String utteranceId) {
+    private static synchronized Runnable finishTtsPlayback(String utteranceId) {
         if (utteranceId != null && utteranceId.equals(activeTtsUtterance)) {
             activeTtsUtterance = null;
+            Runnable completion = activeTtsCompletion;
+            activeTtsCompletion = null;
+            return completion;
         }
+        return null;
+    }
+
+    private static void runCompletion(Runnable completion) {
+        if (completion == null) return;
+        MAIN.post(() -> {
+            try {
+                completion.run();
+            } catch (Exception e) {
+                DebugLog.add("TTS", "播放完成回調失敗: " + e.getClass().getSimpleName());
+            }
+        });
     }
 }

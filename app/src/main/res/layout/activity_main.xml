@@ -320,7 +320,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:checked="false"
-            android:text="到點嘗試直接打開 ChatGPT 語音（取代本機語音）"
+            android:text="安慰播放完後打開 ChatGPT 語音"
             android:textSize="14sp" />
 
         <Button
@@ -337,7 +337,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="優先呼叫 ChatGPT 語音 Activity；如果 Android 阻止背景彈窗，請點前景通知內的「ChatGPT 語音」按鈕。"
+            android:text="先播放完整段安慰；播放結束後再呼叫 ChatGPT 語音。如果背景彈窗被阻止，請點前景通知內的「ChatGPT 語音」按鈕。"
             android:textSize="12sp"
             android:textColor="#7FA88F" />
 

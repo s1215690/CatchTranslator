@@ -16,8 +16,8 @@ android {
         applicationId "com.yupi.catchtranslator"
         minSdk 26
         targetSdk 34
-        versionCode 50
-        versionName "0.33.0"
+        versionCode 51
+        versionName "0.34.0"
     }
 
     signingConfigs {

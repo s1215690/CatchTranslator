@@ -179,7 +179,7 @@ public class MainActivity extends Activity {
                 getSharedPreferences("settings", MODE_PRIVATE).edit()
                         .putBoolean(ActiveComfortService.PREF_LAUNCH_ASSISTANT, checked).apply();
                 Toast.makeText(this, checked
-                        ? "到點會嘗試打開 ChatGPT 語音"
+                        ? "安慰播放完後會打開 ChatGPT 語音"
                         : "已改回本機語音安慰", Toast.LENGTH_SHORT).show();
             }
         });
@@ -712,7 +712,8 @@ public class MainActivity extends Activity {
         }
         String intervalLabel = activeComfortIntervalLabel(minutes);
         tvActiveComfortStatus.setText(enabled
-                ? "主動安慰已開啟 · 每 " + intervalLabel + "生成並播出（其他播放時會暫停）"
+                ? "主動安慰已開啟 · 每 " + intervalLabel + "生成並播放"
+                + (launchAssistant ? "，播放完後打開 ChatGPT 語音" : "（其他播放時會暫停）")
                 : "目前未啟用");
         tvActiveComfortAssistantStatus.setText(
                 ActiveComfortService.getAssistantStatus(this));
