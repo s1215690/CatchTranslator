@@ -39,6 +39,7 @@ public class BluetoothKeepAliveService extends Service {
     private static final int SAMPLE_RATE = 48_000;
     private static final int CHANNEL_MASK = AudioFormat.CHANNEL_OUT_STEREO;
     private static final int SIGNAL_FRAMES = SAMPLE_RATE / 5; // 200 ms；方便無縫循環
+    private static final long PULSE_INTERVAL_MS = 60_000L; // 每 60 秒重新送出一次短音頻
     private static final long MONITOR_INTERVAL_MS = 2_000L;
     private static final long ROUTE_VERIFY_DELAY_MS = 500L;
     // 19 kHz 在部分藍牙編碼器會被當成靜音；混入很低音量的 320 Hz，較容易被音箱的休眠偵測辨認。
@@ -267,8 +268,8 @@ public class BluetoothKeepAliveService extends Service {
             startAudio(device);
         } else {
             AudioDeviceInfo routed = getRoutedDevice(audioTrack);
-            updateStatus("保活中 · 實際輸出：" + deviceName(routed)
-                    + "（近乎靜音）");
+            updateStatus("定時保活中 · 實際輸出：" + deviceName(routed)
+                    + "（每 60 秒播放 200 毫秒）");
         }
     }
 
@@ -337,15 +338,15 @@ public class BluetoothKeepAliveService extends Service {
             final AudioTrack local = candidate;
             audioThread = new Thread(() -> writeSignal(local), "BluetoothKeepAlive");
             audioThread.start();
-            updateStatus("保活啟動中 · 正在確認藍牙音箱路由");
+            updateStatus("定時保活啟動中 · 正在確認藍牙音箱路由");
             handler.postDelayed(() -> {
                 if (audioTrack != local || !audioLoopRunning) return;
                 if (!isRoutedToDevice(local, device)) {
                     updateStatus("藍牙音箱路由未生效，正在重試");
                     stopAudio();
                 } else {
-                    updateStatus("保活中 · 實際輸出：" + deviceName(getRoutedDevice(local))
-                            + "（近乎靜音）");
+                    updateStatus("定時保活中 · 實際輸出：" + deviceName(getRoutedDevice(local))
+                            + "（每 60 秒播放 200 毫秒）");
                 }
             }, ROUTE_VERIFY_DELAY_MS);
         } catch (Exception e) {
@@ -364,6 +365,19 @@ public class BluetoothKeepAliveService extends Service {
                     && !VoicePlayer.isPlaybackActive()) {
                 int written = local.write(signal, 0, signal.length, AudioTrack.WRITE_BLOCKING);
                 if (written <= 0) break;
+                // 音箱休眠計時器只需要偶爾收到真正的 PCM；中間留白，減少持續可聽見的聲音。
+                long remaining = PULSE_INTERVAL_MS;
+                while (remaining > 0 && audioLoopRunning && audioTrack == local
+                        && !VoicePlayer.isPlaybackActive()) {
+                    long sleepMs = Math.min(remaining, MONITOR_INTERVAL_MS);
+                    try {
+                        Thread.sleep(sleepMs);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    remaining -= sleepMs;
+                }
             }
         } catch (Exception ignored) {
             // 路由切換或音箱斷線時由主線程重新建立／停止 AudioTrack。

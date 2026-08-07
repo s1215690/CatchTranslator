@@ -266,7 +266,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="用近乎聽不到的非零訊號，避免音箱因長時間無聲而自動休眠；App 語音播放時會自動讓路。"
+            android:text="每 60 秒播放約 200 毫秒的短音頻，避免音箱因長時間無聲而自動休眠；App 語音播放時會自動讓路。"
             android:textSize="13sp"
             android:textColor="#7FA88F" />
 
@@ -276,7 +276,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:checked="true"
-            android:text="開啟藍牙音箱保活（近乎靜音）"
+            android:text="開啟藍牙音箱保活（定時短音頻）"
             android:textSize="14sp" />
 
         <TextView
