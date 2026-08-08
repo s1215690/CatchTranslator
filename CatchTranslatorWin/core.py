@@ -1142,8 +1142,7 @@ class ActiveComfortController:
     MAX_INTERVAL = 300
 
     def __init__(self, settings: SettingsStore, db: TranslatorDb, ai: AIEngine, tts: TTSPlayer,
-                 status: Callable[[str], None], after_play: Callable[[], None], log: DebugLog,
-                 on_response: Optional[Callable[[str], None]] = None):
+                 status: Callable[[str], None], after_play: Callable[[], None], log: DebugLog):
         self.settings = settings
         self.db = db
         self.ai = ai
@@ -1151,7 +1150,6 @@ class ActiveComfortController:
         self.status = status
         self.after_play = after_play
         self.log = log
-        self.on_response = on_response
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
@@ -1211,11 +1209,6 @@ class ActiveComfortController:
                 if not response.reply or self._stop.is_set() or not self.enabled:
                     continue
                 self.db.insert("主動安慰", response.reply, "proactive_comfort")
-                if self.on_response is not None:
-                    try:
-                        self.on_response(response.reply)
-                    except Exception as exc:
-                        self.log.add("Comfort", f"主動安慰 HUD 回調失敗: {type(exc).__name__}")
                 launch = bool(self.settings.get("active_comfort_launch_assistant", False))
                 if launch:
                     self.tts.speak(

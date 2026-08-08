@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from core import AIEngine, DebugLog, HeadUpScheduler, SettingsStore, TimedNudgeScheduler, TranslatorDb
+from main import HEAD_UP_MESSAGES
 
 
 class CoreSmokeTests(unittest.TestCase):
@@ -47,6 +48,11 @@ class CoreSmokeTests(unittest.TestCase):
             self.assertIn("安全最短 1 分鐘", scheduler.interval_description())
             scheduler.start()
             scheduler.stop()
+
+    def test_head_up_message_bank(self):
+        self.assertEqual(len(HEAD_UP_MESSAGES), 1000)
+        self.assertEqual(len(set(HEAD_UP_MESSAGES)), 1000)
+        self.assertTrue(all("抬頭" in message for message in HEAD_UP_MESSAGES))
 
 
 if __name__ == "__main__":

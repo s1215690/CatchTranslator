@@ -41,13 +41,47 @@ HUD_FG = "#FFE14D"
 HUD_SHADOW = "#000000"
 HUD_FONT = "Microsoft YaHei UI"
 
-HEAD_UP_MESSAGES = (
-    "抬頭一下，望遠處 20 秒。",
-    "肩膀放低，慢慢眨幾下眼。",
-    "飲一啖水，等身體追返你。",
-    "你唔需要一次做晒所有嘢。",
-    "停一停，感受一下雙腳踩住地面。",
-    "將手機放低一陣，畀自己一口氣。",
+_HEAD_UP_OPENERS = (
+    "抬頭一下，",
+    "而家抬頭，",
+    "記得抬頭，",
+    "請抬頭，",
+    "停一停，抬頭，",
+    "溫柔提醒：抬頭，",
+    "輪到你抬頭，",
+    "俾自己一個抬頭時刻，",
+    "先抬頭再繼續，",
+    "工作一陣，抬頭，",
+)
+_HEAD_UP_FOCUSES = (
+    "望向遠處",
+    "望下窗外",
+    "望向螢幕上方",
+    "望一望房間較遠的位置",
+    "望一望窗邊",
+    "望向一件綠色物件",
+    "將視線帶到遠處",
+    "離開螢幕，望向前方",
+    "望向天花板附近",
+    "望一望前面較高的位置",
+)
+_HEAD_UP_ENDINGS = (
+    "，俾雙眼休息幾秒。",
+    "，慢慢眨三下眼。",
+    "，畀眼睛離開近距離一陣。",
+    "，保持幾秒再回來。",
+    "，唔使急住做下一步。",
+    "，等視線放鬆一下。",
+    "，望夠 20 秒就可以。",
+    "，呼吸一下再繼續。",
+    "，畀自己一個短短休息。",
+    "，抬頭完成先再做手頭嘢。",
+)
+HEAD_UP_MESSAGES = tuple(
+    f"{opener}{focus}{ending}"
+    for opener in _HEAD_UP_OPENERS
+    for focus in _HEAD_UP_FOCUSES
+    for ending in _HEAD_UP_ENDINGS
 )
 
 
@@ -520,7 +554,6 @@ class YupiSaverApp(tk.Tk):
             self.status,
             self.after_comfort,
             self.log,
-            on_response=lambda text: self.after(0, lambda: self.show_hud(text, "💛 主動安慰")),
         )
         self.nudge = NudgeController(
             self.ai,
@@ -684,7 +717,7 @@ class YupiSaverApp(tk.Tk):
         ttk.Label(interval_row, text="0 會採用安全最短 1 分鐘", style="Muted.TLabel").pack(side="left")
         ttk.Checkbutton(box.body, text="安慰語音播放完後開啟 ChatGPT 網頁語音", variable=self.assistant_var, command=self.toggle_assistant).grid(row=6, column=1, sticky="w", pady=4)
         ttk.Separator(box.body).grid(row=7, column=0, columnspan=2, sticky="ew", pady=8)
-        ttk.Checkbutton(box.body, text="開啟抬頭顯示（透明全屏大字，不會播放語音）", variable=self.hud_var, command=lambda: self.set_hud_enabled(self.hud_var.get())).grid(row=8, column=1, sticky="w", pady=4)
+        ttk.Checkbutton(box.body, text="開啟定時抬頭顯示（只顯示抬頭提示，不顯示其他內容）", variable=self.hud_var, command=lambda: self.set_hud_enabled(self.hud_var.get())).grid(row=8, column=1, sticky="w", pady=4)
         ttk.Checkbutton(box.body, text="定時抬頭提醒（隨機間隔，避免太機械）", variable=self.head_up_var, command=lambda: self.set_head_up_enabled(self.head_up_var.get())).grid(row=9, column=1, sticky="w", pady=4)
         ttk.Label(box.body, text="抬頭間隔（0-300 分鐘）").grid(row=10, column=0, sticky="w", pady=4)
         head_interval_row = ttk.Frame(box.body)
@@ -701,7 +734,7 @@ class YupiSaverApp(tk.Tk):
         ttk.Label(box.body, text="浮窗大小").grid(row=15, column=0, sticky="w", pady=4)
         self.panel_size_var = tk.StringVar(value=self.settings.get("panel_size", "large"))
         ttk.Combobox(box.body, textvariable=self.panel_size_var, state="readonly", values=("small", "medium", "large"), width=15).grid(row=15, column=1, sticky="w", pady=4)
-        ttk.Label(box.body, text="抬頭顯示會在 AI 回覆、推動力、定時提醒和主動安慰時出現；按一下或 Esc 可提前關閉。", style="Muted.TLabel", wraplength=680).grid(row=16, column=1, sticky="w", pady=(5, 0))
+        ttk.Label(box.body, text="內置 1000 句抬頭話術，定時隨機抽一句；按一下或 Esc 可提前關閉。", style="Muted.TLabel", wraplength=680).grid(row=16, column=1, sticky="w", pady=(5, 0))
 
     def _build_records_section(self, parent) -> None:
         box = Collapsible(parent, "📊 統計、每日總結與最近記錄", True)
@@ -942,7 +975,6 @@ class YupiSaverApp(tk.Tk):
         self.last_replies.append(response.reply)
         self.last_replies = self.last_replies[-6:]
         self.tts.speak(response.reply, response.emotion, response.tag)
-        self.show_hud(response.reply, "YupiSaver")
         self.status(f"已記低（{channel}）：「{text}」｜{response.reply}")
         if response.buttons and len(response.buttons) == self.button_count():
             self.current_buttons = response.buttons
@@ -980,7 +1012,6 @@ class YupiSaverApp(tk.Tk):
     def _gratitude_done(self, text: str, reply: str) -> None:
         self.db.insert("感恩", text, "gratitude")
         self.tts.speak(reply, "happy", self.ai.throttle_tag(self.ai.suggest_tag(reply, "happy")))
-        self.show_hud(reply, "🙏 感恩")
         self.status(f"🙏 已記低：「{text}」｜{reply}")
         self.refresh_view()
 
@@ -1024,7 +1055,6 @@ class YupiSaverApp(tk.Tk):
             self.status(f"⏰ 定時提醒設定失敗：{exc}")
 
     def timer_due(self, task: str) -> None:
-        self.show_hud(task, "⏰ 時間到")
         self.status(f"⏰ 時間到：「{task}」——開始逐步確認")
         self.tts.speak(f"時間到喇，依家一步一步陪你做：{task}。")
         self.start_nudge(task, timed=True)
@@ -1037,12 +1067,10 @@ class YupiSaverApp(tk.Tk):
 
     def nudge_phrase(self, index: int, total: int, step: str, phrase: str) -> None:
         self.nudge_popup.update_phrase(index, total, step, phrase)
-        self.show_hud(phrase, "⏰ 定時推動" if self.nudge.timed else "🚀 推動力")
 
     def nudge_end(self, task: str, done: bool) -> None:
         self.nudge_popup.hide()
         self.db.insert("推動完成" if done else "推動取消", task, "nudge")
-        self.show_hud("完成咗，做得好！" if done else "冇所謂，想嘅時候再嚟。", "🚀 推動力")
         self.status((f"好嘢！完成咗「{task}」🎉" if done else f"冇所謂，想嘅時候再嚟：「{task}」"))
         self.refresh_view()
 
@@ -1059,7 +1087,6 @@ class YupiSaverApp(tk.Tk):
         self.last_replies.append(response.reply)
         self.last_replies = self.last_replies[-6:]
         self.tts.speak(response.reply, response.emotion, response.tag)
-        self.show_hud(response.reply, "💛 再安慰多啲")
         self.status(f"💛「{self.last_topic}」｜{response.reply}")
 
     def counter_argument(self, text: str) -> None:
@@ -1102,7 +1129,6 @@ class YupiSaverApp(tk.Tk):
     def _followup_done(self, kind: str, source: str, reply: str) -> None:
         self.db.insert(kind, source + " → " + reply, "followup")
         self.tts.speak(reply)
-        self.show_hud(reply, kind)
         self.status(f"{kind}：「{reply}」")
         self.refresh_view()
 
@@ -1151,7 +1177,7 @@ class YupiSaverApp(tk.Tk):
     def test_head_up(self) -> None:
         if not self.hud_var.get():
             self.set_hud_enabled(True)
-        self.show_hud("透明大字會浮在畫面上，點一下或按 Esc 就會消失。", "⬆ 抬頭顯示測試")
+        self.show_hud(random.choice(HEAD_UP_MESSAGES), "⬆ 抬頭測試")
 
     def head_up_tick(self) -> None:
         if not self.settings.get("head_up_enabled", False):
