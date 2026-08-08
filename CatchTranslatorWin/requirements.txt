@@ -1,0 +1,4 @@
+requests>=2.31.0
+edge-tts>=7.0.0
+pyttsx3>=2.90
+pyinstaller>=6.0.0
